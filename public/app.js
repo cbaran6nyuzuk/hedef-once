@@ -27,7 +27,7 @@ const elements = Object.fromEntries([
   "assuranceEngineIcon", "assuranceEngine", "assuranceEngineDetail", "assuranceParityIcon", "assuranceParity", "assuranceParityDetail",
   "paperCapital", "paperRisk", "paperAllocation", "paperConcurrent", "paperReport", "paperReturn",
   "paperInitial", "paperFinal", "paperProfit", "paperTrades", "paperDrawdown", "paperExplanation", "paperLedger",
-  "paperReviews", "replayDay", "archiveCoverage"
+  "paperReviews", "replayDay", "archiveCoverage", "historicalDate", "historicalReplayButton", "replayModeNotice"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -430,6 +430,13 @@ async function loadReplayAvailability() {
 }
 
 function renderReplay(report) {
+  if (report.mode === "HISTORICAL_RECONSTRUCTION") {
+    elements.replayModeNotice.className = "replay-mode-notice reconstructed";
+    elements.replayModeNotice.textContent = "TARİHSEL CANLANDIRMA · Motor seçilen günün verisini saat saat gördü. 1 dakikalık fiyatlar tarihsel; bid/ask 5 bps muhafazakâr proxy, haber erişimi yayın zamanı proxy'sidir. Resmî forward sayacına eklenmez.";
+  } else {
+    elements.replayModeNotice.className = "replay-mode-notice full-pit";
+    elements.replayModeNotice.textContent = "TAM POINT-IN-TIME · O anda gerçekten yakalanmış fiyat, bid/ask, haber, SEC ve takvim görüntüleri kullanıldı.";
+  }
   elements.replaySummary.hidden = false;
   elements.replayFullMoments.textContent = report.diagnostics.fullPointInTimeSnapshots.toLocaleString("tr-TR");
   elements.replayCandidates.textContent = report.candidates.toLocaleString("tr-TR");
@@ -472,6 +479,39 @@ function renderReplay(report) {
     elements.replayResults.append(item);
   }
   elements.replaySummary.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function paperSettings() {
+  return {
+    initialCapital: Number(elements.paperCapital.value),
+    riskPct: Number(elements.paperRisk.value),
+    maxPositionPct: Number(elements.paperAllocation.value),
+    maxConcurrent: Number(elements.paperConcurrent.value)
+  };
+}
+
+async function runHistoricalDate() {
+  if (!elements.historicalDate.value) {
+    elements.replayDiagnostics.textContent = "İnternetten yüklenecek tarihi seçmelisin.";
+    return;
+  }
+  elements.historicalReplayButton.disabled = true;
+  elements.historicalReplayButton.textContent = "19 seri ve bağlam yükleniyor…";
+  elements.replayDiagnostics.textContent = "Seçilen günün 19 piyasa serisi, haberleri, SEC kayıtları ve olay takvimi yükleniyor; motor zamanı 5'er dakika ilerletecek.";
+  try {
+    const response = await fetch("/api/historical-replay", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: elements.historicalDate.value, portfolio: paperSettings() })
+    });
+    const report = await response.json();
+    if (!response.ok) throw new Error(report.error);
+    renderReplay(report);
+  } catch (error) {
+    elements.replayDiagnostics.textContent = error.message;
+  } finally {
+    elements.historicalReplayButton.disabled = false;
+    elements.historicalReplayButton.textContent = "Tarihi yükle ve canlandır";
+  }
 }
 
 const paperSkipLabels = {
@@ -571,7 +611,7 @@ async function runReplay() {
     return;
   }
   if (startTime < availableStart || endTime > availableEnd) {
-    elements.replayDiagnostics.textContent = "Seçtiğin zaman tam katmanlı kayıt aralığının dışında. ‘Kayıtlı aralıkla hemen dene’ düğmesini kullan.";
+    elements.replayDiagnostics.textContent = "Seçtiğin saat tam canlı kayıt sınırının dışında. Üstteki tam verili günü çalıştır veya başka bir tarihi internetten yükle.";
     return;
   }
   if (endTime - startTime < 30 * 60_000) {
@@ -587,12 +627,7 @@ async function runReplay() {
       body: JSON.stringify({
         startAt: new Date(elements.replayStart.value).toISOString(),
         endAt: new Date(new Date(elements.replayEnd.value).getTime() + 999).toISOString(),
-        portfolio: {
-          initialCapital: Number(elements.paperCapital.value),
-          riskPct: Number(elements.paperRisk.value),
-          maxPositionPct: Number(elements.paperAllocation.value),
-          maxConcurrent: Number(elements.paperConcurrent.value)
-        }
+        portfolio: paperSettings()
       })
     });
     const report = await response.json();
@@ -795,6 +830,14 @@ elements.refreshButton.addEventListener("click", () => loadSnapshot(true));
 elements.replayButton.addEventListener("click", runReplay);
 elements.replayPresetButton.addEventListener("click", async () => { applyAvailableReplayRange(); await runReplay(); });
 elements.replayDay.addEventListener("change", applyAvailableReplayRange);
+elements.historicalReplayButton.addEventListener("click", runHistoricalDate);
+const historicalToday = new Date();
+const historicalMin = new Date(historicalToday); historicalMin.setUTCDate(historicalMin.getUTCDate() - 29);
+const historicalDefault = new Date(historicalToday); historicalDefault.setUTCDate(historicalDefault.getUTCDate() - 1);
+while ([0, 6].includes(historicalDefault.getUTCDay())) historicalDefault.setUTCDate(historicalDefault.getUTCDate() - 1);
+elements.historicalDate.max = historicalDefault.toISOString().slice(0, 10);
+elements.historicalDate.min = historicalMin.toISOString().slice(0, 10);
+elements.historicalDate.value = historicalDefault.toISOString().slice(0, 10);
 renderSelection();
 await Promise.all([loadSnapshot(), loadReplayAvailability()]);
 setInterval(() => loadSnapshot(), 60_000);

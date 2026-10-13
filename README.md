@@ -70,6 +70,8 @@ Her sanal işlemin altında **Motor neyi okudu?** incelemesi bulunur. Giriş ger
 
 Tarih seçimi yalnız **tam canlı verisi kaydedilmiş günleri** açar. Piyasa mumları tek başına yeterli değildir: o dakikanın bid/ask görüntüsü, haberin ilk görülme zamanı, SEC/takvim görünümü ve veri gecikmesi de karar anından önce kaydedilmiş olmalıdır. Arşivlenmemiş geçmiş günler sonradan tam canlıymış gibi doldurulmaz; bu, veri sızıntısını önleyen bilinçli bir sınırdır. Kolektör açık kaldıkça yeni işlem günleri otomatik olarak seçim listesine eklenir.
 
+Arşiv dışındaki yakın bir tarih için **Tarihi yükle ve canlandır** modu bulunur. Test başladığında son 30 gün içindeki seçilen ABD işlem gününe ait 19 sembolün 1 dakikalık OHLCV verisi, tarihsel haber yayını, SEC kabul zamanları ve olay takvimi internetten alınır. Zaman 5 dakikalık adımlarla ilerler ve her adımda yalnız o saate kadar yayımlanmış veri prediction motoruna verilir. Anahtarsız kaynak tarihsel bid/ask ile haberin gerçek ilk görülme zamanını sağlamadığı için 5 bps muhafazakâr spread ve haber yayın zamanı proxy olarak kullanılır. Bu sonuç sarı **Tarihsel canlandırma** etiketi taşır ve resmî canlı-forward sayacına eklenmez. Daha eski 1 dakikalık veri anahtarsız kaynakta bulunmadığından 30 günden eski seçim reddedilir.
+
 Arayüzdeki **Puanın hesabını aç** bölümü aynı denetim izini kullanıcı dilinde gösterir. Formülün doğru hesaplanması ile formülün geleceği iyi tahmin etmesi ayrı durumlar olarak işaretlenir.
 
 ## Şu anda alınan gerçek veriler
