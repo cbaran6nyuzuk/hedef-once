@@ -27,7 +27,8 @@ const elements = Object.fromEntries([
   "assuranceEngineIcon", "assuranceEngine", "assuranceEngineDetail", "assuranceParityIcon", "assuranceParity", "assuranceParityDetail",
   "paperCapital", "paperRisk", "paperAllocation", "paperConcurrent", "paperReport", "paperReturn",
   "paperInitial", "paperFinal", "paperProfit", "paperTrades", "paperDrawdown", "paperExplanation", "paperLedger",
-  "paperReviews", "replayDay", "archiveCoverage", "historicalDate", "historicalReplayButton", "replayModeNotice"
+  "paperReviews", "replayDay", "archiveCoverage", "historicalDate", "historicalReplayButton", "replayModeNotice",
+  "replayTrust", "replayTrustTitle", "replayTrustBadge", "replayTrustPlain", "replayTruthList", "replayWarningList", "replayCheckList"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -398,6 +399,44 @@ const replayReasonLabels = {
   FEATURE_BARS_INCOMPLETE: "5 dakikalık mum geçmişi eksik"
 };
 
+function renderReplayTrust(report) {
+  const trust = report.trustReport;
+  if (!trust) {
+    elements.replayTrust.hidden = true;
+    return;
+  }
+  elements.replayTrust.hidden = false;
+  const trustClass = trust.level === "FULL_PIT" ? "full-pit" : trust.level === "BLOCKED" ? "blocked" : "reconstructed";
+  elements.replayTrust.className = `replay-trust ${trustClass}`;
+  elements.replayTrustTitle.textContent = trust.title;
+  elements.replayTrustBadge.textContent = trust.usableForOfficialForward ? "Resmi sayaca girer" : "Resmi sayaca girmez";
+  elements.replayTrustPlain.textContent = `${trust.plainStatus} Bütünlük kontrolü: ${trust.passedChecks}/${trust.totalChecks}.`;
+  elements.replayTruthList.replaceChildren(...(trust.sourceLines ?? []).map(([label, value]) => {
+    const article = document.createElement("article");
+    const title = document.createElement("span");
+    const body = document.createElement("strong");
+    title.textContent = label;
+    body.textContent = value;
+    article.append(title, body);
+    return article;
+  }));
+  elements.replayWarningList.replaceChildren(...(trust.warnings?.length ? trust.warnings : ["Bu test için ek veri uyarısı yok."]).map((warning) => {
+    const item = document.createElement("p");
+    item.textContent = warning;
+    return item;
+  }));
+  elements.replayCheckList.replaceChildren(...(trust.checks ?? []).map((check) => {
+    const row = document.createElement("div");
+    const name = document.createElement("span");
+    const result = document.createElement("b");
+    name.textContent = check.name;
+    result.textContent = check.passed ? "Geçti" : "Kaldı";
+    if (!check.passed) result.className = "failed";
+    row.append(name, result);
+    return row;
+  }));
+}
+
 async function loadReplayAvailability() {
   try {
     const response = await fetch("/api/replay/availability");
@@ -437,6 +476,7 @@ function renderReplay(report) {
     elements.replayModeNotice.className = "replay-mode-notice full-pit";
     elements.replayModeNotice.textContent = "TAM POINT-IN-TIME · O anda gerçekten yakalanmış fiyat, bid/ask, haber, SEC ve takvim görüntüleri kullanıldı.";
   }
+  renderReplayTrust(report);
   elements.replaySummary.hidden = false;
   elements.replayFullMoments.textContent = report.diagnostics.fullPointInTimeSnapshots.toLocaleString("tr-TR");
   elements.replayCandidates.textContent = report.candidates.toLocaleString("tr-TR");
@@ -476,6 +516,8 @@ function renderReplay(report) {
       Number.isFinite(row.result.netReturn) ? formatPercent(row.result.netReturn * 100) : "—"
     ];
     for (const value of values) { const cell = document.createElement("span"); cell.textContent = value; item.append(cell); }
+    const trace = row.replayDataTrace;
+    if (trace) item.title = `Veri izi: ${trace.mode} · son özellik mumu ${formatClock(trace.latestFeatureBarEndAt)} · giriş kaynağı ${trace.executionSource ?? "—"}`;
     elements.replayResults.append(item);
   }
   elements.replaySummary.scrollIntoView({ behavior: "smooth", block: "center" });
