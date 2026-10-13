@@ -64,6 +64,8 @@ Arayüzdeki **Zaman Makinesi** bölümünde başlangıç ve bitiş zamanı seçi
 
 İlk kontrol için **Kayıtlı aralıkla hemen dene** düğmesi kullanılır. Sonucun mekanik olarak geçerli olması için `5/5 bütünlük kontrolü geçti` yazmalıdır. Ana örnek sayısı `Bağımsız “şimdi”` alanıdır; üst üste binen kararlar burada bir kez sayılır. Replay'in çalışması kârlılık kanıtı değildir: ön değerlendirme için en az 10 farklı gün ve 30 bağımsız sinyal, model hakkında karar vermek için en az 60 gün ve 100 bağımsız sinyal gerekir.
 
+Zaman Makinesi aynı zamanda **Sanal Kasa** çalıştırır. Kullanıcı başlangıç parasını, işlem başına kabul edilen kasa riskini, tek pozisyona ayrılabilecek azami oranı ve aynı anda taşınabilecek işlem sayısını seçer. Motor her tamamlanmış 5 dakikalık karar anında yalnızca `Şimdi` durumundaki, daha sonra sonucu olgunlaşmış adayları ele alır. Pozisyon büyüklüğü stop mesafesi ve risk bütçesine göre hesaplanır; aynı hissede aynı anda tek pozisyon taşınır. Ücret ve iki yönlü stres kayması her işlemden düşülür. İşlem günlüğü ayrılan para, adet, sonuç, net kâr/zarar ve işlem sonrası kasayı gösterir. Kesirli hisse ve belirtilen fiyattan tam gerçekleşme varsayımı nedeniyle bu bölüm paper simülasyonudur.
+
 Arayüzdeki **Puanın hesabını aç** bölümü aynı denetim izini kullanıcı dilinde gösterir. Formülün doğru hesaplanması ile formülün geleceği iyi tahmin etmesi ayrı durumlar olarak işaretlenir.
 
 ## Şu anda alınan gerçek veriler

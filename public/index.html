@@ -208,8 +208,14 @@
           <label><span>Bitiş</span><input id="replayEnd" type="datetime-local" step="1"></label>
           <div class="replay-actions">
             <button id="replayPresetButton" class="replay-secondary" type="button" disabled>Kayıtlı aralıkla hemen dene</button>
-            <button id="replayButton" type="button" disabled>Tarafsız testi çalıştır</button>
+            <button id="replayButton" type="button" disabled>Sanal kasayla testi çalıştır</button>
           </div>
+        </div>
+        <div class="paper-settings" aria-label="Sanal kasa ayarları">
+          <label><span>Başlangıç parası</span><input id="paperCapital" type="number" min="1000" max="1000000" step="1000" value="10000"><small>Örnek: 10.000 USD</small></label>
+          <label><span>İşlem başına risk</span><select id="paperRisk"><option value="0.5">Kasanın %0,5'i</option><option value="1" selected>Kasanın %1'i</option><option value="2">Kasanın %2'si</option></select><small>Stop olursa hedeflenen azami kayıp</small></label>
+          <label><span>Tek pozisyon sınırı</span><select id="paperAllocation"><option value="25">Kasanın %25'i</option><option value="50" selected>Kasanın %50'si</option><option value="75">Kasanın %75'i</option></select><small>Tek hisseye bağlanabilecek para</small></label>
+          <label><span>Aynı anda</span><select id="paperConcurrent"><option value="1">1 açık işlem</option><option value="2" selected>2 açık işlem</option></select><small>Aynı hissede yine tek pozisyon</small></label>
         </div>
         <p class="replay-explain" id="replayExplain">Fiyat, bid/ask, sektör, makro, haber, SEC ve takvim katmanlarının birlikte kaydedildiği zamanlar kullanılabilir.</p>
         <div class="replay-summary" id="replaySummary" hidden>
@@ -220,14 +226,26 @@
           <article><span>Net ortalama</span><strong id="replayNetReturn">—</strong></article>
         </div>
         <div class="replay-diagnostics" id="replayDiagnostics"></div>
+        <section class="paper-report" id="paperReport" hidden aria-labelledby="paperReportTitle">
+          <div class="paper-report-head"><div><span>SANAL KASA</span><h3 id="paperReportTitle">Motorun para günlüğü</h3></div><strong id="paperReturn">—</strong></div>
+          <div class="paper-summary">
+            <article><span>Başlangıç</span><strong id="paperInitial">—</strong></article>
+            <article><span>Test sonu</span><strong id="paperFinal">—</strong></article>
+            <article><span>Net kazanç / kayıp</span><strong id="paperProfit">—</strong></article>
+            <article><span>Açılan işlem</span><strong id="paperTrades">—</strong></article>
+            <article><span>Gerçekleşen azami düşüş</span><strong id="paperDrawdown">—</strong></article>
+          </div>
+          <p id="paperExplanation">Motorun yaptığı işlemler aşağıda gösterilir.</p>
+          <div class="paper-ledger" id="paperLedger"></div>
+        </section>
         <div class="replay-results" id="replayResults"></div>
         <details class="replay-guide" open>
           <summary>Doğru test için kullanım kılavuzu</summary>
           <div class="replay-guide-grid">
             <article><b>1 · Önce çalışan örneği doğrula</b><p><strong>Kayıtlı aralıkla hemen dene</strong> düğmesine bas. Sonuçta “5/5 bütünlük kontrolü geçti” yazmalı.</p></article>
             <article><b>2 · Sonra kendi aralığını seç</b><p>Üstte gösterilen uygun zaman sınırlarının içinde kal. En az 30 dakikalık bir aralık seç; tek test en fazla 31 gün olabilir.</p></article>
-            <article><b>3 · Ana sonucu doğru oku</b><p><strong>Bağımsız “şimdi”</strong>, motorun gerçekten giriş penceresi açtığı ve birbiriyle çakışmayan örnek sayısıdır. Ana güven ölçüsü budur.</p></article>
-            <article><b>4 · Tek başına başarı oranına bakma</b><p>Hedef önce oranını; maliyet sonrası net ortalama, stop önce, timeout, MU/SNDK ve Quick/Extended ayrımlarıyla birlikte değerlendir.</p></article>
+            <article><b>3 · Sanal kasayı oku</b><p>Motor yalnızca <strong>“Şimdi”</strong> dediğinde para ayırır. Stop mesafesine göre adet belirler, aynı hissede ikinci pozisyon açmaz ve ücret/kaymayı kasadan düşer.</p></article>
+            <article><b>4 · Sonuca erken hüküm verme</b><p>Kasa sonucu; işlem sırası ve para yönetimini canlandırır. Tahmin gücü için yine farklı piyasa günleri ve yeterli bağımsız işlem gerekir.</p></article>
           </div>
           <div class="replay-confidence">
             <span><b>Mekanik kontrol</b> 5/5 bütünlük testi</span>

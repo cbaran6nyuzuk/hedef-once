@@ -24,7 +24,9 @@ const elements = Object.fromEntries([
   "replayTargetRate", "replayNetReturn", "replayDiagnostics", "replayResults", "systemAssurance",
   "systemAssuranceTitle", "systemAssuranceExplanation", "systemTrustInstruction", "assuranceMarketIcon",
   "assuranceMarket", "assuranceMarketDetail", "assuranceContextIcon", "assuranceContext", "assuranceContextDetail",
-  "assuranceEngineIcon", "assuranceEngine", "assuranceEngineDetail", "assuranceParityIcon", "assuranceParity", "assuranceParityDetail"
+  "assuranceEngineIcon", "assuranceEngine", "assuranceEngineDetail", "assuranceParityIcon", "assuranceParity", "assuranceParityDetail",
+  "paperCapital", "paperRisk", "paperAllocation", "paperConcurrent", "paperReport", "paperReturn",
+  "paperInitial", "paperFinal", "paperProfit", "paperTrades", "paperDrawdown", "paperExplanation", "paperLedger"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -41,6 +43,12 @@ function formatPercent(value) {
 function formatVolume(value) {
   if (!Number.isFinite(value)) return "—";
   return new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function formatUsd(value) {
+  return Number.isFinite(value)
+    ? new Intl.NumberFormat("tr-TR", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+    : "—";
 }
 
 function formatClock(iso) {
@@ -421,6 +429,7 @@ function renderReplay(report) {
     ? `Dışarıda tutulan anlar: ${exclusions.map(([reason, count]) => `${replayReasonLabels[reason] ?? reason}: ${count}`).join(" · ")}`
     : "Seçilen aralıktaki bütün anlar point-in-time kontrollerinden geçti.";
   elements.replayDiagnostics.textContent = `${passedChecks}/${report.integrityChecks.length} bütünlük kontrolü geçti. ${exclusionText}`;
+  renderPaperPortfolio(report.portfolio);
   elements.replayResults.replaceChildren();
   const rows = report.rows.filter((row) => row.signalWindow === "NOW" || row.result.status === "MATURED").slice(-100);
   if (!rows.length) {
@@ -452,6 +461,66 @@ function renderReplay(report) {
   elements.replaySummary.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+const paperSkipLabels = {
+  SAME_SYMBOL_ALREADY_OPEN: "Aynı hissede işlem zaten açıktı",
+  MAX_CONCURRENT_REACHED: "Açık işlem sınırı doluydu",
+  INSUFFICIENT_CASH_OR_RISK_BUDGET: "Kasa veya risk bütçesi yetersizdi"
+};
+
+function renderPaperPortfolio(portfolio) {
+  elements.paperReport.hidden = false;
+  elements.paperInitial.textContent = formatUsd(portfolio?.initialCapital);
+  elements.paperFinal.textContent = formatUsd(portfolio?.finalCapital);
+  elements.paperProfit.textContent = formatUsd(portfolio?.netProfit);
+  elements.paperProfit.className = portfolio?.netProfit > 0 ? "positive" : portfolio?.netProfit < 0 ? "negative" : "muted-text";
+  elements.paperReturn.textContent = Number.isFinite(portfolio?.totalReturn) ? formatPercent(portfolio.totalReturn * 100) : "—";
+  elements.paperReturn.className = portfolio?.totalReturn > 0 ? "positive" : portfolio?.totalReturn < 0 ? "negative" : "muted-text";
+  elements.paperTrades.textContent = `${portfolio?.executedTrades ?? 0} açıldı · ${portfolio?.skippedSignals ?? 0} pas geçildi`;
+  elements.paperDrawdown.textContent = Number.isFinite(portfolio?.maxRealizedDrawdown) ? formatPercent(-portfolio.maxRealizedDrawdown * 100) : "—";
+  elements.paperExplanation.textContent = `${portfolio?.cadenceMinutes ?? 5} dakikada bir karar kontrolü · işlem başına %${portfolio?.settings?.riskPct ?? "—"} risk · tek pozisyonda en fazla %${portfolio?.settings?.maxPositionPct ?? "—"} kasa · ücret ve kayma dahil.`;
+  elements.paperLedger.replaceChildren();
+  if (!portfolio?.trades?.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Bu aralıkta motorun parayla girebileceği olgunlaşmış bir “Şimdi” kararı yok.";
+    elements.paperLedger.append(empty);
+    return;
+  }
+  const header = document.createElement("div");
+  header.className = "paper-ledger-row paper-ledger-head";
+  for (const label of ["Giriş", "İşlem", "Ayrılan para", "Adet", "Sonuç", "Net", "Kasa"]) {
+    const cell = document.createElement("span"); cell.textContent = label; header.append(cell);
+  }
+  elements.paperLedger.append(header);
+  for (const trade of portfolio.trades) {
+    const row = document.createElement("div");
+    row.className = "paper-ledger-row";
+    const values = [
+      new Date(trade.entryAt).toLocaleString("tr-TR"),
+      `${trade.symbol} · ${trade.modelLabel} · ${trade.decisionScore}/100`,
+      formatUsd(trade.notional),
+      trade.quantity.toLocaleString("tr-TR", { maximumFractionDigits: 4 }),
+      ({ TARGET_FIRST: "Hedef önce", STOP_FIRST: "Stop önce", TIMEOUT: "Süre doldu" })[trade.outcome] ?? trade.outcome,
+      formatUsd(trade.netPnlUsd),
+      formatUsd(trade.balanceAfter)
+    ];
+    values.forEach((value, index) => {
+      const cell = document.createElement("span"); cell.textContent = value;
+      if (index === 5) cell.className = trade.netPnlUsd > 0 ? "positive" : "negative";
+      row.append(cell);
+    });
+    row.title = trade.reason;
+    elements.paperLedger.append(row);
+  }
+  if (portfolio.skipped?.length) {
+    const reasons = Object.entries(portfolio.skipped.reduce((result, item) => ({ ...result, [item.reason]: (result[item.reason] ?? 0) + 1 }), {}));
+    const note = document.createElement("p");
+    note.className = "paper-skipped";
+    note.textContent = `Pas geçilenler: ${reasons.map(([reason, count]) => `${paperSkipLabels[reason] ?? reason}: ${count}`).join(" · ")}`;
+    elements.paperLedger.append(note);
+  }
+}
+
 async function runReplay() {
   if (!elements.replayStart.value || !elements.replayEnd.value) {
     elements.replayDiagnostics.textContent = "Başlangıç ve bitiş zamanını seçmelisin.";
@@ -481,7 +550,13 @@ async function runReplay() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         startAt: new Date(elements.replayStart.value).toISOString(),
-        endAt: new Date(new Date(elements.replayEnd.value).getTime() + 999).toISOString()
+        endAt: new Date(new Date(elements.replayEnd.value).getTime() + 999).toISOString(),
+        portfolio: {
+          initialCapital: Number(elements.paperCapital.value),
+          riskPct: Number(elements.paperRisk.value),
+          maxPositionPct: Number(elements.paperAllocation.value),
+          maxConcurrent: Number(elements.paperConcurrent.value)
+        }
       })
     });
     const report = await response.json();
@@ -491,7 +566,7 @@ async function runReplay() {
     elements.replayDiagnostics.textContent = error.message;
   } finally {
     elements.replayButton.disabled = false;
-    elements.replayButton.textContent = "Tarafsız testi çalıştır";
+    elements.replayButton.textContent = "Sanal kasayla testi çalıştır";
   }
 }
 
