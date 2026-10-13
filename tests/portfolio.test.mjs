@@ -6,7 +6,9 @@ function row({ id, symbol = "MU", entryAt, outcomeAt, grossReturn, score = 85, s
   return {
     candidateId: id, symbol, modelKey: "quick", modelLabel: "Hızlı +1", signalWindow: "NOW",
     entryAt, entryPrice: 100, stopPct, decisionScore: score, riskLevel: "MEDIUM",
-    result: { status: "MATURED", outcomeAt, outcome: grossReturn > 0 ? "TARGET_FIRST" : "STOP_FIRST", exitPrice: 100 * (1 + grossReturn), grossReturn }
+    targetPct: 0.01, timingReasons: ["5 dakikalık dönüş oluştu"], softVetos: ["HIGH_IMPACT_EVENT_TODAY"],
+    scores: { priceVolume: 88, targetStop: 90, execution: 75 },
+    result: { status: "MATURED", outcomeAt, outcome: grossReturn > 0 ? "TARGET_FIRST" : "STOP_FIRST", exitPrice: 100 * (1 + grossReturn), grossReturn, mfe: grossReturn > 0 ? 0.01 : 0.006, mae: grossReturn > 0 ? -0.002 : -0.006 }
   };
 }
 
@@ -38,4 +40,6 @@ test("risk bütçesi, pozisyon tavanı ve gerçek maliyet kasaya uygulanır", ()
   assert.equal(report.trades[0].costsUsd, 8);
   assert.equal(report.trades[0].netPnlUsd, -38);
   assert.equal(report.finalCapital, 9962);
+  assert.match(report.trades[0].review.missed, /varsayımı yanlıştı/);
+  assert.equal(report.trades[0].review.modelUpdate, "FROZEN_NO_AUTOMATIC_UPDATE");
 });

@@ -66,6 +66,10 @@ Arayüzdeki **Zaman Makinesi** bölümünde başlangıç ve bitiş zamanı seçi
 
 Zaman Makinesi aynı zamanda **Sanal Kasa** çalıştırır. Kullanıcı başlangıç parasını, işlem başına kabul edilen kasa riskini, tek pozisyona ayrılabilecek azami oranı ve aynı anda taşınabilecek işlem sayısını seçer. Motor her tamamlanmış 5 dakikalık karar anında yalnızca `Şimdi` durumundaki, daha sonra sonucu olgunlaşmış adayları ele alır. Pozisyon büyüklüğü stop mesafesi ve risk bütçesine göre hesaplanır; aynı hissede aynı anda tek pozisyon taşınır. Ücret ve iki yönlü stres kayması her işlemden düşülür. İşlem günlüğü ayrılan para, adet, sonuç, net kâr/zarar ve işlem sonrası kasayı gösterir. Kesirli hisse ve belirtilen fiyattan tam gerçekleşme varsayımı nedeniyle bu bölüm paper simülasyonudur.
 
+Her sanal işlemin altında **Motor neyi okudu?** incelemesi bulunur. Giriş gerekçesi, önceden görülen riskler, sonuçta çalışan varsayım, bozulan varsayım ve geliştirme döneminde sınanabilecek soru ayrı gösterilir. İnceleme otomatik olarak ağırlık veya eşik değiştirmez. Değişiklik adayları yalnız geliştirme günlerindeki toplu sonuçlardan çıkarılır; doğrulama döneminde motor dondurulur ve kilitli test bölümü geliştirme için kullanılmaz.
+
+Tarih seçimi yalnız **tam canlı verisi kaydedilmiş günleri** açar. Piyasa mumları tek başına yeterli değildir: o dakikanın bid/ask görüntüsü, haberin ilk görülme zamanı, SEC/takvim görünümü ve veri gecikmesi de karar anından önce kaydedilmiş olmalıdır. Arşivlenmemiş geçmiş günler sonradan tam canlıymış gibi doldurulmaz; bu, veri sızıntısını önleyen bilinçli bir sınırdır. Kolektör açık kaldıkça yeni işlem günleri otomatik olarak seçim listesine eklenir.
+
 Arayüzdeki **Puanın hesabını aç** bölümü aynı denetim izini kullanıcı dilinde gösterir. Formülün doğru hesaplanması ile formülün geleceği iyi tahmin etmesi ayrı durumlar olarak işaretlenir.
 
 ## Şu anda alınan gerçek veriler

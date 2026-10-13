@@ -203,6 +203,10 @@
 
       <section class="replay-panel">
         <div class="panel-heading"><div><h2>Zaman Makinesi</h2><p>Modeli seçtiğin tarih aralığında, yalnızca o anda bilinen verilerle yeniden çalıştır</p></div><span id="replayAvailability">Uygun aralık yükleniyor</span></div>
+        <div class="archive-picker">
+          <label><span>Tam canlı verisi kaydedilmiş gün</span><select id="replayDay" disabled><option>Günler yükleniyor</option></select></label>
+          <p id="archiveCoverage">Geçmişte gerçekten kaydedilmiş fiyat, bid/ask, haber, SEC ve takvim katmanları kontrol ediliyor.</p>
+        </div>
         <div class="replay-controls">
           <label><span>Başlangıç</span><input id="replayStart" type="datetime-local" step="1"></label>
           <label><span>Bitiş</span><input id="replayEnd" type="datetime-local" step="1"></label>
@@ -237,6 +241,11 @@
           </div>
           <p id="paperExplanation">Motorun yaptığı işlemler aşağıda gösterilir.</p>
           <div class="paper-ledger" id="paperLedger"></div>
+          <div class="trade-reviews" id="paperReviews"></div>
+          <div class="learning-lock">
+            <strong>ÖĞRENME KİLİDİ · BU TEST MOTORU DEĞİŞTİRMEDİ</strong>
+            <p>Doğru ve yanlış okumalar işlem bazında açıklanır. Yeni kural yalnız geliştirme günlerindeki toplu örneklerden adaylaştırılır. Doğrulama günlerinde motor dondurulur; kilitli test yalnız bir kez açılır.</p>
+          </div>
         </section>
         <div class="replay-results" id="replayResults"></div>
         <details class="replay-guide" open>

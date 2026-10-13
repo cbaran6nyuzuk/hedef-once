@@ -26,7 +26,8 @@ const elements = Object.fromEntries([
   "assuranceMarket", "assuranceMarketDetail", "assuranceContextIcon", "assuranceContext", "assuranceContextDetail",
   "assuranceEngineIcon", "assuranceEngine", "assuranceEngineDetail", "assuranceParityIcon", "assuranceParity", "assuranceParityDetail",
   "paperCapital", "paperRisk", "paperAllocation", "paperConcurrent", "paperReport", "paperReturn",
-  "paperInitial", "paperFinal", "paperProfit", "paperTrades", "paperDrawdown", "paperExplanation", "paperLedger"
+  "paperInitial", "paperFinal", "paperProfit", "paperTrades", "paperDrawdown", "paperExplanation", "paperLedger",
+  "paperReviews", "replayDay", "archiveCoverage"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -370,8 +371,15 @@ function localInputValue(iso) {
 function applyAvailableReplayRange() {
   const availability = state.replayAvailability;
   if (!availability?.fullPitStart) return;
-  elements.replayStart.value = localInputValue(availability.fullPitStart);
-  elements.replayEnd.value = localInputValue(availability.fullPitEnd);
+  const selectedDay = availability.fullPitDays?.find((day) => day.date === elements.replayDay.value);
+  const startAt = selectedDay?.startAt ?? availability.fullPitStart;
+  const endAt = selectedDay?.endAt ?? availability.fullPitEnd;
+  elements.replayStart.min = localInputValue(startAt);
+  elements.replayStart.max = localInputValue(endAt);
+  elements.replayEnd.min = localInputValue(startAt);
+  elements.replayEnd.max = localInputValue(endAt);
+  elements.replayStart.value = localInputValue(startAt);
+  elements.replayEnd.value = localInputValue(endAt);
 }
 
 function replayOutcomeLabel(result) {
@@ -401,11 +409,16 @@ async function loadReplayAvailability() {
       return;
     }
     state.replayAvailability = availability;
-    elements.replayAvailability.textContent = `${new Date(availability.fullPitStart).toLocaleString("tr-TR")} → ${new Date(availability.fullPitEnd).toLocaleString("tr-TR")}`;
-    elements.replayStart.min = localInputValue(availability.fullPitStart);
-    elements.replayStart.max = localInputValue(availability.fullPitEnd);
-    elements.replayEnd.min = localInputValue(availability.fullPitStart);
-    elements.replayEnd.max = localInputValue(availability.fullPitEnd);
+    const days = availability.fullPitDays ?? [];
+    elements.replayAvailability.textContent = `${days.length} tam verili gün · ${availability.fullPitSnapshots} kayıt`;
+    elements.replayDay.replaceChildren(...days.map((day) => {
+      const option = document.createElement("option");
+      option.value = day.date;
+      option.textContent = `${new Date(`${day.date}T12:00:00Z`).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })} · ${day.snapshots} kayıt`;
+      return option;
+    }));
+    elements.replayDay.disabled = false;
+    elements.archiveCoverage.textContent = `${days.length} ABD işlem gününde bütün canlı katmanlar birlikte kaydedilmiş. Listede olmayan bir gün için canlıyla aynı test üretilemez; sistem açık kaldıkça yeni günler eklenir.`;
     applyAvailableReplayRange();
     elements.replayButton.disabled = false;
     elements.replayPresetButton.disabled = false;
@@ -479,6 +492,7 @@ function renderPaperPortfolio(portfolio) {
   elements.paperDrawdown.textContent = Number.isFinite(portfolio?.maxRealizedDrawdown) ? formatPercent(-portfolio.maxRealizedDrawdown * 100) : "—";
   elements.paperExplanation.textContent = `${portfolio?.cadenceMinutes ?? 5} dakikada bir karar kontrolü · işlem başına %${portfolio?.settings?.riskPct ?? "—"} risk · tek pozisyonda en fazla %${portfolio?.settings?.maxPositionPct ?? "—"} kasa · ücret ve kayma dahil.`;
   elements.paperLedger.replaceChildren();
+  elements.paperReviews.replaceChildren();
   if (!portfolio?.trades?.length) {
     const empty = document.createElement("p");
     empty.className = "empty-state";
@@ -511,6 +525,28 @@ function renderPaperPortfolio(portfolio) {
     });
     row.title = trade.reason;
     elements.paperLedger.append(row);
+    const review = document.createElement("details");
+    review.className = "trade-review";
+    const summary = document.createElement("summary");
+    summary.textContent = `${trade.symbol} · ${new Date(trade.entryAt).toLocaleString("tr-TR")} · Motor neyi okudu?`;
+    const grid = document.createElement("div");
+    grid.className = "trade-review-grid";
+    const sections = [
+      ["Neden pozisyona girdi?", trade.review?.entryReasons?.join(" · ") || trade.reason],
+      ["Önceden görülen riskler", trade.review?.warnings?.length ? trade.review.warnings.join(" · ") : "Belirgin ek uyarı yoktu."],
+      ["Neyi doğru okudu?", trade.review?.understood ?? "—"],
+      ["Neyi yanlış veya eksik okudu?", trade.review?.missed ?? "—"],
+      ["Geliştirmede sınanacak soru", trade.review?.developmentQuestion ?? "—"],
+      ["Motor güncellendi mi?", trade.review?.modelUpdateExplanation ?? "Hayır."]
+    ];
+    for (const [title, description] of sections) {
+      const article = document.createElement("article");
+      const heading = document.createElement("b"); heading.textContent = title;
+      const text = document.createElement("p"); text.textContent = description;
+      article.append(heading, text); grid.append(article);
+    }
+    review.append(summary, grid);
+    elements.paperReviews.append(review);
   }
   if (portfolio.skipped?.length) {
     const reasons = Object.entries(portfolio.skipped.reduce((result, item) => ({ ...result, [item.reason]: (result[item.reason] ?? 0) + 1 }), {}));
@@ -758,6 +794,7 @@ document.addEventListener("click", (event) => {
 elements.refreshButton.addEventListener("click", () => loadSnapshot(true));
 elements.replayButton.addEventListener("click", runReplay);
 elements.replayPresetButton.addEventListener("click", async () => { applyAvailableReplayRange(); await runReplay(); });
+elements.replayDay.addEventListener("change", applyAvailableReplayRange);
 renderSelection();
 await Promise.all([loadSnapshot(), loadReplayAvailability()]);
 setInterval(() => loadSnapshot(), 60_000);
