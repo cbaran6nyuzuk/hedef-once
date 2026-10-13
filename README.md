@@ -5,6 +5,8 @@ Canlı prediction motoru sabit kurallı araştırma skoru üretir; walk-forward 
 
 Arayüzde her teknik verinin yanında günlük Türkçe karşılığı bulunur. Üstteki **“Şimdi ne yapmalıyım?”** kartı kararı `İşlem açma`, `Şimdilik bekle` veya `Sadece paper takip et` olarak söyler ve değişmesi beklenen şartları listeler. Bu metinler sinyal kaydına da yazıldığı için ileride aynı açıklamalar bildirimlerde kullanılabilir.
 
+En üstteki **Sistem Güvencesi** kartı dört ayrı kontrolü gösterir: 19 piyasa serisinin güncelliği, haber/SEC/takvim bağlantıları, karar motorunun son çalışması ve canlı motor ile Zaman Makinesi'nin aynı kod ve strateji sürümünü kullanması. Normal seans dışındayken sarı `Sinyal bekleme`, bütün katmanlar hazır ve seans açıkken yeşil `Motor karar arıyor`, herhangi bir katman eski veya eksikken kırmızı `Sinyale güvenme` görünür. Motor kimliği, strateji dosyası ile prediction kodunun özetidir; canlı ve replay sonucunda aynı kimlik kullanılır.
+
 ## Kısa vadeli giriş zamanlaması
 
 Prediction motoru artık günlük hisse yönünü ana karar olarak kullanmaz. +%1/+%1,5 hedefi için tamamlanmış 5 dakikalık mumlarda satış sonrası dönüşü, kısa ortalama ivmesini, yükselen dip veya üç mumluk kırılımı, yakın desteğe göre stop uzaklığını ve hedefe tahmini süreyi birlikte ölçer. Memory, sektör, makro ve haber katmanları bağlam ve risk uyarısıdır; güçlü bir yakın dönem tetiğini tek başına iptal etmez. Arayüz `Giriş penceresi: Açık / Hazırlanıyor / Kapalı / Engelli` ve `Taktik risk: Düşük / Orta / Yüksek` alanlarını gösterir.
@@ -59,6 +61,8 @@ npm run audit:replay
 ```
 
 Arayüzdeki **Zaman Makinesi** bölümünde başlangıç ve bitiş zamanı seçilir. Sistem yalnızca fiyat, bid/ask, sektör, makro, haber, SEC ve takvim katmanlarının o anda birlikte kaydedildiği aralığı açar. Toplama başlamadan önceki tarihler için tam veri varmış gibi sonuç üretmez.
+
+İlk kontrol için **Kayıtlı aralıkla hemen dene** düğmesi kullanılır. Sonucun mekanik olarak geçerli olması için `5/5 bütünlük kontrolü geçti` yazmalıdır. Ana örnek sayısı `Bağımsız “şimdi”` alanıdır; üst üste binen kararlar burada bir kez sayılır. Replay'in çalışması kârlılık kanıtı değildir: ön değerlendirme için en az 10 farklı gün ve 30 bağımsız sinyal, model hakkında karar vermek için en az 60 gün ve 100 bağımsız sinyal gerekir.
 
 Arayüzdeki **Puanın hesabını aç** bölümü aynı denetim izini kullanıcı dilinde gösterir. Formülün doğru hesaplanması ile formülün geleceği iyi tahmin etmesi ayrı durumlar olarak işaretlenir.
 

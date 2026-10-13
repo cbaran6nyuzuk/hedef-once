@@ -2,7 +2,8 @@ const state = {
   symbol: "MU",
   model: "quick",
   snapshot: null,
-  loading: false
+  loading: false,
+  replayAvailability: null
 };
 
 const elements = Object.fromEntries([
@@ -19,8 +20,11 @@ const elements = Object.fromEntries([
   "cycleNext", "cycleInvalidation", "motorEvidence", "scoreAuditList", "dataCorrectness",
   "calculationCorrectness", "predictionCorrectness", "backtestStatus", "backtestDays", "backtestLabels",
   "backtestActionable", "backtestExcluded", "backtestNote", "replayAvailability", "replayStart", "replayEnd",
-  "replayButton", "replayExplain", "replaySummary", "replayFullMoments", "replayCandidates", "replayIndependent",
-  "replayTargetRate", "replayNetReturn", "replayDiagnostics", "replayResults"
+  "replayButton", "replayPresetButton", "replayExplain", "replaySummary", "replayFullMoments", "replayCandidates", "replayIndependent",
+  "replayTargetRate", "replayNetReturn", "replayDiagnostics", "replayResults", "systemAssurance",
+  "systemAssuranceTitle", "systemAssuranceExplanation", "systemTrustInstruction", "assuranceMarketIcon",
+  "assuranceMarket", "assuranceMarketDetail", "assuranceContextIcon", "assuranceContext", "assuranceContextDetail",
+  "assuranceEngineIcon", "assuranceEngine", "assuranceEngineDetail", "assuranceParityIcon", "assuranceParity", "assuranceParityDetail"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -51,6 +55,44 @@ function stateLabel(value) {
 function layerState(element, connected, readyLabel = "Bağlı") {
   element.textContent = connected ? readyLabel : "Eksik";
   element.className = connected ? "positive" : "warning-text";
+}
+
+function ageText(seconds) {
+  if (!Number.isFinite(seconds)) return "zaman bilinmiyor";
+  if (seconds < 60) return `${Math.max(0, seconds)} saniye önce`;
+  return `${Math.floor(seconds / 60)} dakika önce`;
+}
+
+function setAssuranceCheck(icon, title, passed, readyText, failedText) {
+  icon.textContent = passed ? "✓" : "!";
+  icon.className = passed ? "passed" : "failed";
+  title.textContent = passed ? readyText : failedText;
+  title.className = passed ? "positive" : "negative";
+}
+
+function renderSystemAssurance(system) {
+  if (!system) {
+    elements.systemAssurance.className = "system-assurance degraded";
+    elements.systemAssuranceTitle.textContent = "Sistem durumu alınamadı";
+    elements.systemAssuranceExplanation.textContent = "Canlı katmanları doğrulayamıyorum.";
+    elements.systemTrustInstruction.textContent = "SİNYALE GÜVENME";
+    return;
+  }
+  const degraded = system.state === "DEGRADED";
+  elements.systemAssurance.className = `system-assurance ${degraded ? "degraded" : system.state === "LIVE_AND_SCORING" ? "live" : "waiting"}`;
+  elements.systemAssuranceTitle.textContent = system.label;
+  elements.systemAssuranceExplanation.textContent = system.plainExplanation;
+  elements.systemTrustInstruction.textContent = degraded ? "SİNYALE GÜVENME" : system.state === "LIVE_AND_SCORING" ? "MOTOR KARAR ARIYOR" : "SİNYAL BEKLEME";
+
+  const checks = system.checks ?? {};
+  setAssuranceCheck(elements.assuranceMarketIcon, elements.assuranceMarket, checks.market?.passed, "Güncel ve tam", "Eksik veya eski");
+  elements.assuranceMarketDetail.textContent = `${checks.market?.series ?? 0}/${checks.market?.requiredSeries ?? 19} seri · ${ageText(checks.market?.ageSeconds)}`;
+  setAssuranceCheck(elements.assuranceContextIcon, elements.assuranceContext, checks.context?.passed, "Üçü de bağlı", "Bağlantı eksik");
+  elements.assuranceContextDetail.textContent = `Haber ${checks.context?.news ? "✓" : "×"} · SEC ${checks.context?.filings ? "✓" : "×"} · Takvim ${checks.context?.calendar ? "✓" : "×"} · ${ageText(checks.context?.ageSeconds)}`;
+  setAssuranceCheck(elements.assuranceEngineIcon, elements.assuranceEngine, checks.predictor?.passed, `Çalışıyor · v${system.engineVersion}`, "Güncel çalışmadı");
+  elements.assuranceEngineDetail.textContent = `${ageText(checks.predictor?.ageSeconds)} · ${checks.predictor?.candidates ?? 0} aday`;
+  setAssuranceCheck(elements.assuranceParityIcon, elements.assuranceParity, checks.replayParity?.passed, "Aynı motor ve kurallar", "Eşitlik doğrulanamadı");
+  elements.assuranceParityDetail.textContent = `Motor kimliği ${system.engineFingerprint ?? "—"}`;
 }
 
 const vetoLabels = {
@@ -317,11 +359,28 @@ function localInputValue(iso) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
 }
 
+function applyAvailableReplayRange() {
+  const availability = state.replayAvailability;
+  if (!availability?.fullPitStart) return;
+  elements.replayStart.value = localInputValue(availability.fullPitStart);
+  elements.replayEnd.value = localInputValue(availability.fullPitEnd);
+}
+
 function replayOutcomeLabel(result) {
   if (result.status === "PENDING") return "Sonuç bekliyor";
   if (result.status === "EXCLUDED") return "Test dışı";
   return ({ TARGET_FIRST: "Hedef önce", STOP_FIRST: "Stop önce", TIMEOUT: "Süre doldu" })[result.outcome] ?? "—";
 }
+
+const replayReasonLabels = {
+  CONTEXT_NOT_CAPTURED: "Haber/SEC/takvim kaydı yok",
+  CONTEXT_LAYER_INCOMPLETE: "Bağlam katmanı eksik",
+  CONTEXT_TOO_OLD: "Bağlam 45 dakikadan eski",
+  MARKET_LAYER_INCOMPLETE: "Piyasa sepeti eksik",
+  OUTSIDE_REGULAR_SESSION: "Normal seans dışında",
+  EXECUTION_LAYER_INCOMPLETE: "Bid/ask veya spread eksik",
+  FEATURE_BARS_INCOMPLETE: "5 dakikalık mum geçmişi eksik"
+};
 
 async function loadReplayAvailability() {
   try {
@@ -333,13 +392,15 @@ async function loadReplayAvailability() {
       elements.replayButton.disabled = true;
       return;
     }
+    state.replayAvailability = availability;
     elements.replayAvailability.textContent = `${new Date(availability.fullPitStart).toLocaleString("tr-TR")} → ${new Date(availability.fullPitEnd).toLocaleString("tr-TR")}`;
     elements.replayStart.min = localInputValue(availability.fullPitStart);
     elements.replayStart.max = localInputValue(availability.fullPitEnd);
     elements.replayEnd.min = localInputValue(availability.fullPitStart);
     elements.replayEnd.max = localInputValue(availability.fullPitEnd);
-    elements.replayStart.value = localInputValue(availability.fullPitStart);
-    elements.replayEnd.value = localInputValue(availability.fullPitEnd);
+    applyAvailableReplayRange();
+    elements.replayButton.disabled = false;
+    elements.replayPresetButton.disabled = false;
     elements.replayExplain.textContent = availability.notice;
   } catch (error) {
     elements.replayAvailability.textContent = "Aralık alınamadı";
@@ -357,7 +418,7 @@ function renderReplay(report) {
   const exclusions = Object.entries(report.diagnostics.excludedByReason);
   const passedChecks = report.integrityChecks.filter((check) => check.passed).length;
   const exclusionText = exclusions.length
-    ? `Dışarıda tutulan anlar: ${exclusions.map(([reason, count]) => `${reason} ${count}`).join(" · ")}`
+    ? `Dışarıda tutulan anlar: ${exclusions.map(([reason, count]) => `${replayReasonLabels[reason] ?? reason}: ${count}`).join(" · ")}`
     : "Seçilen aralıktaki bütün anlar point-in-time kontrollerinden geçti.";
   elements.replayDiagnostics.textContent = `${passedChecks}/${report.integrityChecks.length} bütünlük kontrolü geçti. ${exclusionText}`;
   elements.replayResults.replaceChildren();
@@ -367,6 +428,7 @@ function renderReplay(report) {
     empty.className = "empty-state";
     empty.textContent = report.candidates ? "Kararlar üretildi fakat bu aralıkta olgunlaşmış veya ‘şimdi’ durumunda bir örnek yok." : "Bu aralıkta tam verili bir karar üretilemedi.";
     elements.replayResults.append(empty);
+    elements.replaySummary.scrollIntoView({ behavior: "smooth", block: "center" });
     return;
   }
   const header = document.createElement("div");
@@ -387,10 +449,30 @@ function renderReplay(report) {
     for (const value of values) { const cell = document.createElement("span"); cell.textContent = value; item.append(cell); }
     elements.replayResults.append(item);
   }
+  elements.replaySummary.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 async function runReplay() {
-  if (!elements.replayStart.value || !elements.replayEnd.value) return;
+  if (!elements.replayStart.value || !elements.replayEnd.value) {
+    elements.replayDiagnostics.textContent = "Başlangıç ve bitiş zamanını seçmelisin.";
+    return;
+  }
+  const startTime = new Date(elements.replayStart.value).getTime();
+  const endTime = new Date(elements.replayEnd.value).getTime();
+  const availableStart = Math.floor(new Date(state.replayAvailability?.fullPitStart).getTime() / 1000) * 1000;
+  const availableEnd = Math.ceil(new Date(state.replayAvailability?.fullPitEnd).getTime() / 1000) * 1000;
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) {
+    elements.replayDiagnostics.textContent = "Bitiş zamanı başlangıçtan sonra olmalı.";
+    return;
+  }
+  if (startTime < availableStart || endTime > availableEnd) {
+    elements.replayDiagnostics.textContent = "Seçtiğin zaman tam katmanlı kayıt aralığının dışında. ‘Kayıtlı aralıkla hemen dene’ düğmesini kullan.";
+    return;
+  }
+  if (endTime - startTime < 30 * 60_000) {
+    elements.replayDiagnostics.textContent = "Anlamlı bir deneme için en az 30 dakikalık aralık seç.";
+    return;
+  }
   elements.replayButton.disabled = true;
   elements.replayButton.textContent = "Test çalışıyor…";
   elements.replayDiagnostics.textContent = "Her karar anının veri katmanları ve gelecekten bilgi sızıntısı kontrol ediliyor.";
@@ -498,6 +580,7 @@ function render() {
   renderSelection();
   const snapshot = state.snapshot;
   if (!snapshot) return;
+  renderSystemAssurance(snapshot.system);
   const quote = snapshot.quotes[state.symbol];
   const execution = snapshot.execution?.[state.symbol];
   const ready = snapshot.readiness.status === "MARKET_LAYER_READY";
@@ -599,6 +682,7 @@ document.addEventListener("click", (event) => {
 
 elements.refreshButton.addEventListener("click", () => loadSnapshot(true));
 elements.replayButton.addEventListener("click", runReplay);
+elements.replayPresetButton.addEventListener("click", async () => { applyAvailableReplayRange(); await runReplay(); });
 renderSelection();
 await Promise.all([loadSnapshot(), loadReplayAvailability()]);
 setInterval(() => loadSnapshot(), 60_000);

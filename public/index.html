@@ -20,6 +20,23 @@
         <span>Veri gecikmesi ve eksik katmanlar görünür tutulur. Emir gönderilmez.</span>
       </div>
 
+      <section class="system-assurance loading" id="systemAssurance" aria-labelledby="systemAssuranceTitle">
+        <div class="assurance-head">
+          <div>
+            <span>SİSTEM GÜVENCESİ</span>
+            <h2 id="systemAssuranceTitle">Kontrol ediliyor</h2>
+            <p id="systemAssuranceExplanation">Canlı veri, karar motoru ve test eşitliği doğrulanıyor.</p>
+          </div>
+          <strong id="systemTrustInstruction">Bekle</strong>
+        </div>
+        <div class="assurance-grid">
+          <article><i id="assuranceMarketIcon">…</i><div><span>Canlı piyasa</span><strong id="assuranceMarket">Kontrol ediliyor</strong><small id="assuranceMarketDetail">19 veri serisi bekleniyor</small></div></article>
+          <article><i id="assuranceContextIcon">…</i><div><span>Haber · SEC · takvim</span><strong id="assuranceContext">Kontrol ediliyor</strong><small id="assuranceContextDetail">Üç bağlantı bekleniyor</small></div></article>
+          <article><i id="assuranceEngineIcon">…</i><div><span>Karar motoru</span><strong id="assuranceEngine">Kontrol ediliyor</strong><small id="assuranceEngineDetail">Son çalışma bekleniyor</small></div></article>
+          <article><i id="assuranceParityIcon">…</i><div><span>Canlı ↔ test eşitliği</span><strong id="assuranceParity">Kontrol ediliyor</strong><small id="assuranceParityDetail">Motor kimliği bekleniyor</small></div></article>
+        </div>
+      </section>
+
       <div class="switch-row">
         <div class="segment" role="group" aria-label="Hisse seçimi">
           <button class="active" type="button" data-symbol="MU">MU</button>
@@ -189,7 +206,10 @@
         <div class="replay-controls">
           <label><span>Başlangıç</span><input id="replayStart" type="datetime-local" step="1"></label>
           <label><span>Bitiş</span><input id="replayEnd" type="datetime-local" step="1"></label>
-          <button id="replayButton" type="button">Tarafsız testi çalıştır</button>
+          <div class="replay-actions">
+            <button id="replayPresetButton" class="replay-secondary" type="button" disabled>Kayıtlı aralıkla hemen dene</button>
+            <button id="replayButton" type="button" disabled>Tarafsız testi çalıştır</button>
+          </div>
         </div>
         <p class="replay-explain" id="replayExplain">Fiyat, bid/ask, sektör, makro, haber, SEC ve takvim katmanlarının birlikte kaydedildiği zamanlar kullanılabilir.</p>
         <div class="replay-summary" id="replaySummary" hidden>
@@ -201,6 +221,21 @@
         </div>
         <div class="replay-diagnostics" id="replayDiagnostics"></div>
         <div class="replay-results" id="replayResults"></div>
+        <details class="replay-guide" open>
+          <summary>Doğru test için kullanım kılavuzu</summary>
+          <div class="replay-guide-grid">
+            <article><b>1 · Önce çalışan örneği doğrula</b><p><strong>Kayıtlı aralıkla hemen dene</strong> düğmesine bas. Sonuçta “5/5 bütünlük kontrolü geçti” yazmalı.</p></article>
+            <article><b>2 · Sonra kendi aralığını seç</b><p>Üstte gösterilen uygun zaman sınırlarının içinde kal. En az 30 dakikalık bir aralık seç; tek test en fazla 31 gün olabilir.</p></article>
+            <article><b>3 · Ana sonucu doğru oku</b><p><strong>Bağımsız “şimdi”</strong>, motorun gerçekten giriş penceresi açtığı ve birbiriyle çakışmayan örnek sayısıdır. Ana güven ölçüsü budur.</p></article>
+            <article><b>4 · Tek başına başarı oranına bakma</b><p>Hedef önce oranını; maliyet sonrası net ortalama, stop önce, timeout, MU/SNDK ve Quick/Extended ayrımlarıyla birlikte değerlendir.</p></article>
+          </div>
+          <div class="replay-confidence">
+            <span><b>Mekanik kontrol</b> 5/5 bütünlük testi</span>
+            <span><b>Ön değerlendirme</b> En az 10 gün ve 30 bağımsız sinyal</span>
+            <span><b>Model kararı</b> 60 gün ve 100 bağımsız sinyal</span>
+          </div>
+          <p>Replay, motoru anlamak ve hata bulmak içindir. Ağırlık değiştirme kararı yalnızca geliştirme ve doğrulama bölümünde alınır; kilitli test sonucuna bakarak kural değiştirilmez.</p>
+        </details>
       </section>
 
       <section class="backtest-panel">

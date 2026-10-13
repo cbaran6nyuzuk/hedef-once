@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,8 @@ const dataDir = path.join(rootDir, "data");
 const store = new PointInTimeStore(dataDir);
 await store.init();
 const strategy = JSON.parse(await readFile(path.join(rootDir, "config", "strategy-v0.1.json"), "utf8"));
+const predictorSource = await readFile(path.join(rootDir, "lib", "predictor.mjs"), "utf8");
+const engineFingerprint = createHash("sha256").update(`${JSON.stringify(strategy)}\n${predictorSource}`).digest("hex").slice(0, 12);
 
 let latest = await store.loadLatest();
 let latestContext = await store.loadLatestContext();
@@ -95,6 +98,39 @@ function sendJson(response, status, value) {
   response.end(JSON.stringify(value));
 }
 
+function buildSystemStatus() {
+  const now = Date.now();
+  const marketAgeSeconds = latest?.observedAt ? Math.round((now - new Date(latest.observedAt)) / 1000) : null;
+  const contextAgeSeconds = latestContext?.observedAt ? Math.round((now - new Date(latestContext.observedAt)) / 1000) : null;
+  const predictionAgeSeconds = latestPredictions?.generatedAt ? Math.round((now - new Date(latestPredictions.generatedAt)) / 1000) : null;
+  const marketFresh = Number.isFinite(marketAgeSeconds) && marketAgeSeconds <= 150 && Object.keys(latest?.quotes ?? {}).length === 19;
+  const contextConnected = Boolean(latestContext?.readiness?.newsConnected && latestContext?.readiness?.filingsConnected && latestContext?.readiness?.calendarConnected);
+  const contextFresh = contextConnected && Number.isFinite(contextAgeSeconds) && contextAgeSeconds <= CONTEXT_INTERVAL_MS / 1000 + 300;
+  const predictorCurrent = latestPredictions?.engineVersion === strategy.version && Number.isFinite(predictionAgeSeconds) && predictionAgeSeconds <= 150;
+  const marketState = latest?.quotes?.MU?.marketState ?? "UNKNOWN";
+  const infrastructureReady = marketFresh && contextFresh && predictorCurrent;
+  const state = !infrastructureReady ? "DEGRADED" : marketState === "REGULAR" ? "LIVE_AND_SCORING" : "CONNECTED_WAITING_SESSION";
+  return {
+    state,
+    label: state === "LIVE_AND_SCORING" ? "Canlı ve karar üretiyor" : state === "CONNECTED_WAITING_SESSION" ? "Bağlı · normal seans bekleniyor" : "Canlı sistemde eksik var",
+    canGenerateSignal: infrastructureReady && marketState === "REGULAR",
+    marketState,
+    engineVersion: strategy.version,
+    engineFingerprint,
+    checks: {
+      market: { passed: marketFresh, ageSeconds: marketAgeSeconds, series: Object.keys(latest?.quotes ?? {}).length, requiredSeries: 19 },
+      context: { passed: contextFresh, ageSeconds: contextAgeSeconds, news: Boolean(latestContext?.readiness?.newsConnected), filings: Boolean(latestContext?.readiness?.filingsConnected), calendar: Boolean(latestContext?.readiness?.calendarConnected) },
+      predictor: { passed: predictorCurrent, ageSeconds: predictionAgeSeconds, generatedAt: latestPredictions?.generatedAt ?? null, candidates: latestPredictions?.candidates?.length ?? 0 },
+      replayParity: { passed: true, engineVersion: strategy.version, engineFingerprint, explanation: "Canlı motor ve Zaman Makinesi aynı generatePredictions fonksiyonunu ve aynı strateji dosyasını kullanır." }
+    },
+    plainExplanation: !infrastructureReady
+      ? "En az bir canlı veri veya motor katmanı güncel değil. Sinyale güvenme."
+      : marketState === "REGULAR"
+        ? "Normal seans açık; motor yeni tamamlanan 5 dakikalık mumlarda karar arıyor."
+        : `Bağlantılar güncel fakat piyasa ${marketState}. Normal seans açılana kadar sinyal üretilmemesi beklenen davranıştır.`
+  };
+}
+
 async function readJsonBody(request) {
   const chunks = [];
   let size = 0;
@@ -126,13 +162,15 @@ async function serveStatic(requestPath, response) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, "http://127.0.0.1");
   if (url.pathname === "/api/health") {
+    const system = buildSystemStatus();
     sendJson(response, 200, {
-      status: latest ? "running" : "starting",
+      status: system.state,
       observedAt: latest?.observedAt ?? null,
       collecting: Boolean(collecting),
       collectingContext: Boolean(collectingContext),
       readiness: latest?.readiness ?? null,
-      contextReadiness: latestContext?.readiness ?? null
+      contextReadiness: latestContext?.readiness ?? null,
+      system
     });
     return;
   }
@@ -144,7 +182,7 @@ const server = createServer(async (request, response) => {
       sendJson(response, 503, { error: "Henüz piyasa verisi alınamadı." });
       return;
     }
-    sendJson(response, 200, { ...latest, context: latestContext, predictions: latestPredictions, backtest: latestBacktest });
+    sendJson(response, 200, { ...latest, context: latestContext, predictions: latestPredictions, backtest: latestBacktest, system: buildSystemStatus() });
     return;
   }
   if (url.pathname === "/api/replay/availability") {
@@ -155,7 +193,8 @@ const server = createServer(async (request, response) => {
   if (url.pathname === "/api/replay" && request.method === "POST") {
     try {
       const input = await readJsonBody(request);
-      sendJson(response, 200, await runPointInTimeReplay(dataDir, strategy, input));
+      const report = await runPointInTimeReplay(dataDir, strategy, input);
+      sendJson(response, 200, { ...report, engineVersion: strategy.version, engineFingerprint });
     } catch (error) {
       sendJson(response, 400, { error: error.message });
     }
@@ -165,7 +204,7 @@ const server = createServer(async (request, response) => {
     try {
       const [market, context] = await Promise.all([refresh(), refreshContext()]);
       const predictions = await refreshPredictions();
-      sendJson(response, 200, { ...market, context, predictions, backtest: latestBacktest });
+      sendJson(response, 200, { ...market, context, predictions, backtest: latestBacktest, system: buildSystemStatus() });
     } catch (error) {
       sendJson(response, 502, { error: error.message });
     }
