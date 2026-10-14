@@ -6,5 +6,6 @@ data/latest-context.json
 data/signals/
 data/latest-predictions.json
 data/labels/
+data/backtest-runs/
 data/state.json
 *.log

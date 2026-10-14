@@ -11,6 +11,7 @@ import { labelMaturedSignals } from "./lib/labeler.mjs";
 import { buildForwardBacktestReport } from "./lib/backtest.mjs";
 import { getReplayAvailability, runPointInTimeReplay } from "./lib/replay.mjs";
 import { runHistoricalReplay } from "./lib/historical-replay.mjs";
+import { listBacktestRuns, saveBacktestRun } from "./lib/backtest-journal.mjs";
 import { PointInTimeStore } from "./lib/store.mjs";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
@@ -191,11 +192,17 @@ const server = createServer(async (request, response) => {
     catch (error) { sendJson(response, 500, { error: error.message }); }
     return;
   }
+  if (url.pathname === "/api/backtest-runs") {
+    try { sendJson(response, 200, { runs: await listBacktestRuns(dataDir) }); }
+    catch (error) { sendJson(response, 500, { error: error.message }); }
+    return;
+  }
   if (url.pathname === "/api/replay" && request.method === "POST") {
     try {
       const input = await readJsonBody(request);
       const report = await runPointInTimeReplay(dataDir, strategy, input);
-      sendJson(response, 200, { ...report, engineVersion: strategy.version, engineFingerprint });
+      const saved = await saveBacktestRun(dataDir, { ...report, engineVersion: strategy.version, engineFingerprint }, strategy, engineFingerprint);
+      sendJson(response, 200, saved);
     } catch (error) {
       sendJson(response, 400, { error: error.message });
     }
@@ -205,7 +212,8 @@ const server = createServer(async (request, response) => {
     try {
       const input = await readJsonBody(request);
       const report = await runHistoricalReplay(strategy, input);
-      sendJson(response, 200, { ...report, engineVersion: strategy.version, engineFingerprint });
+      const saved = await saveBacktestRun(dataDir, { ...report, engineVersion: strategy.version, engineFingerprint }, strategy, engineFingerprint);
+      sendJson(response, 200, saved);
     } catch (error) {
       sendJson(response, 400, { error: error.message });
     }

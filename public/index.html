@@ -244,6 +244,23 @@
           <article><span>Net ortalama</span><strong id="replayNetReturn">—</strong></article>
         </div>
         <div class="replay-diagnostics" id="replayDiagnostics"></div>
+        <section class="journal-panel" id="journalPanel" hidden>
+          <div class="journal-head">
+            <div><span>BACKTEST DEFTERİ</span><h3 id="journalTitle">Test kaydı bekleniyor</h3></div>
+            <strong id="journalSaved">—</strong>
+          </div>
+          <div class="journal-grid">
+            <article><span>Test aralığı</span><strong id="journalRange">—</strong><p id="journalRangeDetail">—</p></article>
+            <article><span>Parametreler</span><strong id="journalParams">—</strong><p id="journalParamDetail">—</p></article>
+            <article><span>Neden az karar?</span><strong id="journalFunnel">—</strong><p id="journalFunnelDetail">—</p></article>
+            <article><span>Vaka havuzu</span><strong id="journalCases">—</strong><p id="journalCaseDetail">—</p></article>
+          </div>
+          <div class="case-list" id="journalCaseList"></div>
+          <details class="saved-runs" open>
+            <summary>Kaydedilen son testler</summary>
+            <div id="savedRunList"><p class="empty-state">Henüz kayıt yok.</p></div>
+          </details>
+        </section>
         <section class="paper-report" id="paperReport" hidden aria-labelledby="paperReportTitle">
           <div class="paper-report-head"><div><span>SANAL KASA</span><h3 id="paperReportTitle">Motorun para günlüğü</h3></div><strong id="paperReturn">—</strong></div>
           <div class="paper-summary">

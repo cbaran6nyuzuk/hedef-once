@@ -28,7 +28,9 @@ const elements = Object.fromEntries([
   "paperCapital", "paperRisk", "paperAllocation", "paperConcurrent", "paperReport", "paperReturn",
   "paperInitial", "paperFinal", "paperProfit", "paperTrades", "paperDrawdown", "paperExplanation", "paperLedger",
   "paperReviews", "replayDay", "archiveCoverage", "historicalDate", "historicalReplayButton", "replayModeNotice",
-  "replayTrust", "replayTrustTitle", "replayTrustBadge", "replayTrustPlain", "replayTruthList", "replayWarningList", "replayCheckList"
+  "replayTrust", "replayTrustTitle", "replayTrustBadge", "replayTrustPlain", "replayTruthList", "replayWarningList", "replayCheckList",
+  "journalPanel", "journalTitle", "journalSaved", "journalRange", "journalRangeDetail", "journalParams", "journalParamDetail",
+  "journalFunnel", "journalFunnelDetail", "journalCases", "journalCaseDetail", "journalCaseList", "savedRunList"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -437,6 +439,92 @@ function renderReplayTrust(report) {
   }));
 }
 
+function formatDateTime(value) {
+  return value ? new Date(value).toLocaleString("tr-TR") : "—";
+}
+
+function caseClassLabel(value) {
+  return ({
+    DOGRU_OKUDU: "Doğru okudu",
+    YANLIS_OKUDU: "Yanlış okudu",
+    SUREYI_YANLIS_OKUDU: "Süreyi yanlış okudu"
+  })[value] ?? value ?? "—";
+}
+
+function renderBacktestJournal(report) {
+  const journal = report.backtestJournal;
+  if (!journal) {
+    elements.journalPanel.hidden = true;
+    return;
+  }
+  elements.journalPanel.hidden = false;
+  const params = journal.runParameters;
+  const requested = params.requested ?? {};
+  const funnel = journal.decisionFunnel;
+  const cases = journal.learningCases ?? [];
+  const classCounts = cases.reduce((result, item) => ({ ...result, [item.correctClass]: (result[item.correctClass] ?? 0) + 1 }), {});
+  const start = requested.startAt ? formatDateTime(requested.startAt) : requested.date ?? "—";
+  const end = requested.endAt ? formatDateTime(requested.endAt) : requested.date ?? "—";
+  elements.journalTitle.textContent = `Kayıt ${report.runId ?? "—"}`;
+  elements.journalSaved.textContent = report.savedAt ? `Kaydedildi · ${formatClock(report.savedAt)}` : "Kaydedildi";
+  elements.journalRange.textContent = params.mode === "HISTORICAL_RECONSTRUCTION" ? "Tarihsel canlandırma" : "Tam canlı kayıt";
+  elements.journalRangeDetail.textContent = `${start} → ${end}`;
+  elements.journalParams.textContent = `${params.mechanics?.decisionCadenceMinutes ?? 5} dk · ${params.mechanics?.featureBarSeconds / 60 ?? 5} dk mum`;
+  elements.journalParamDetail.textContent = `Kasa ${formatUsd(params.portfolio?.initialCapital)} · risk %${params.portfolio?.riskPct ?? "—"} · tek pozisyon %${params.portfolio?.maxPositionPct ?? "—"} · kayma ${params.mechanics?.slippageStressBpsPerSide ?? "—"} bps`;
+  elements.journalFunnel.textContent = `${funnel.decisionMoments} an → ${funnel.paperExecutedTrades} işlem`;
+  elements.journalFunnelDetail.textContent = `${funnel.generatedCandidates} aday · ${funnel.paperEligibleSignals} para adayı · ${funnel.paperSkippedSignals} pas. ${funnel.whyFewDecisions?.[0] ?? ""}`;
+  elements.journalCases.textContent = `${cases.length} vaka`;
+  elements.journalCaseDetail.textContent = `Doğru ${classCounts.DOGRU_OKUDU ?? 0} · Yanlış ${classCounts.YANLIS_OKUDU ?? 0} · Süre ${classCounts.SUREYI_YANLIS_OKUDU ?? 0}`;
+  elements.journalCaseList.replaceChildren(...(cases.length ? cases.slice(0, 8).map((item) => {
+    const card = document.createElement("article");
+    card.className = "case-card";
+    const className = item.correctClass === "DOGRU_OKUDU" ? "win" : item.correctClass === "YANLIS_OKUDU" ? "loss" : "timeout";
+    const left = document.createElement("div");
+    left.innerHTML = `<b>${item.symbol} · ${item.modelLabel}</b><span>${formatDateTime(item.entryAt)} · ${item.signalWindow}</span>`;
+    const middle = document.createElement("span");
+    middle.textContent = `${item.beforeDecision?.timingState ?? "—"} · ${item.beforeDecision?.strongestScores?.map((score) => `${score.name} ${score.score}`).join(" / ") ?? "puan yok"}`;
+    const right = document.createElement("strong");
+    right.className = className;
+    right.textContent = `${caseClassLabel(item.correctClass)} · ${Number.isFinite(item.netReturn) ? formatPercent(item.netReturn * 100) : "—"}`;
+    card.append(left, middle, right);
+    return card;
+  }) : [Object.assign(document.createElement("p"), { className: "empty-state", textContent: "Bu testte olgunlaşmış “Şimdi” vakası yok; WAIT/PREPARE adayları ileride ayrı tabloya alınacak." })]));
+}
+
+function renderSavedRuns(runs) {
+  elements.savedRunList.replaceChildren(...(runs.length ? runs.map((run) => {
+    const row = document.createElement("div");
+    row.className = "saved-run-row";
+    const values = [
+      [`${run.mode === "HISTORICAL_RECONSTRUCTION" ? "Tarihsel" : "Canlı"} · ${run.runId}`, formatDateTime(run.savedAt)],
+      [`${run.decisionMoments} karar anı`, `${run.generatedCandidates} aday · ${run.independentSignals} bağımsız`],
+      [`${run.executedTrades} işlem`, Number.isFinite(run.totalReturn) ? formatPercent(run.totalReturn * 100) : "—"],
+      [run.trustLevel, run.officialForwardCounterEligible ? "Resmi sayaca girer" : "Araştırma kaydı"]
+    ];
+    for (const [title, detail] of values) {
+      const cell = document.createElement("div");
+      const strong = document.createElement("b");
+      const span = document.createElement("span");
+      strong.textContent = title;
+      span.textContent = detail;
+      cell.append(strong, span);
+      row.append(cell);
+    }
+    return row;
+  }) : [Object.assign(document.createElement("p"), { className: "empty-state", textContent: "Henüz kayıt yok." })]));
+}
+
+async function loadSavedRuns() {
+  try {
+    const response = await fetch("/api/backtest-runs");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    renderSavedRuns(payload.runs ?? []);
+  } catch {
+    elements.savedRunList.replaceChildren(Object.assign(document.createElement("p"), { className: "empty-state", textContent: "Kaydedilen testler yüklenemedi." }));
+  }
+}
+
 async function loadReplayAvailability() {
   try {
     const response = await fetch("/api/replay/availability");
@@ -477,6 +565,7 @@ function renderReplay(report) {
     elements.replayModeNotice.textContent = "TAM POINT-IN-TIME · O anda gerçekten yakalanmış fiyat, bid/ask, haber, SEC ve takvim görüntüleri kullanıldı.";
   }
   renderReplayTrust(report);
+  renderBacktestJournal(report);
   elements.replaySummary.hidden = false;
   elements.replayFullMoments.textContent = report.diagnostics.fullPointInTimeSnapshots.toLocaleString("tr-TR");
   elements.replayCandidates.textContent = report.candidates.toLocaleString("tr-TR");
@@ -548,6 +637,7 @@ async function runHistoricalDate() {
     const report = await response.json();
     if (!response.ok) throw new Error(report.error);
     renderReplay(report);
+    await loadSavedRuns();
   } catch (error) {
     elements.replayDiagnostics.textContent = error.message;
   } finally {
@@ -675,6 +765,7 @@ async function runReplay() {
     const report = await response.json();
     if (!response.ok) throw new Error(report.error);
     renderReplay(report);
+    await loadSavedRuns();
   } catch (error) {
     elements.replayDiagnostics.textContent = error.message;
   } finally {
@@ -881,5 +972,5 @@ elements.historicalDate.max = historicalDefault.toISOString().slice(0, 10);
 elements.historicalDate.min = historicalMin.toISOString().slice(0, 10);
 elements.historicalDate.value = historicalDefault.toISOString().slice(0, 10);
 renderSelection();
-await Promise.all([loadSnapshot(), loadReplayAvailability()]);
+await Promise.all([loadSnapshot(), loadReplayAvailability(), loadSavedRuns()]);
 setInterval(() => loadSnapshot(), 60_000);
