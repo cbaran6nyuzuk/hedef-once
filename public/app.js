@@ -469,9 +469,11 @@ function renderBacktestJournal(report) {
   elements.journalSaved.textContent = report.savedAt ? `Kaydedildi · ${formatClock(report.savedAt)}` : "Kaydedildi";
   elements.journalRange.textContent = params.mode === "HISTORICAL_RECONSTRUCTION" ? "Tarihsel canlandırma" : "Tam canlı kayıt";
   elements.journalRangeDetail.textContent = `${start} → ${end}`;
-  elements.journalParams.textContent = `${params.mechanics?.decisionCadenceMinutes ?? 5} dk · ${params.mechanics?.featureBarSeconds / 60 ?? 5} dk mum`;
+  const featureMinutes = Number.isFinite(params.mechanics?.featureBarSeconds) ? params.mechanics.featureBarSeconds / 60 : 5;
+  elements.journalParams.textContent = `${params.mechanics?.decisionCadenceMinutes ?? 15} dk düşünme · ${featureMinutes} dk yapı`;
   elements.journalParamDetail.textContent = `Kasa ${formatUsd(params.portfolio?.initialCapital)} · risk %${params.portfolio?.riskPct ?? "—"} · tek pozisyon %${params.portfolio?.maxPositionPct ?? "—"} · kayma ${params.mechanics?.slippageStressBpsPerSide ?? "—"} bps`;
-  elements.journalFunnel.textContent = `${funnel.decisionMoments} an → ${funnel.paperExecutedTrades} işlem`;
+  const observedLabel = Number.isFinite(funnel.observedBars) && funnel.observedBars > 0 ? `${funnel.observedBars} mum` : `${funnel.observedSteps ?? "—"} akış adımı`;
+  elements.journalFunnel.textContent = `${observedLabel} → ${funnel.decisionMoments} düşünme → ${funnel.paperExecutedTrades} işlem`;
   elements.journalFunnelDetail.textContent = `${funnel.generatedCandidates} aday · ${funnel.paperEligibleSignals} para adayı · ${funnel.paperSkippedSignals} pas. ${funnel.whyFewDecisions?.[0] ?? ""}`;
   elements.journalCases.textContent = `${cases.length} vaka`;
   elements.journalCaseDetail.textContent = `Doğru ${classCounts.DOGRU_OKUDU ?? 0} · Yanlış ${classCounts.YANLIS_OKUDU ?? 0} · Süre ${classCounts.SUREYI_YANLIS_OKUDU ?? 0}`;
@@ -559,7 +561,7 @@ async function loadReplayAvailability() {
 function renderReplay(report) {
   if (report.mode === "HISTORICAL_RECONSTRUCTION") {
     elements.replayModeNotice.className = "replay-mode-notice reconstructed";
-    elements.replayModeNotice.textContent = "TARİHSEL CANLANDIRMA · Motor seçilen günün verisini saat saat gördü. 1 dakikalık fiyatlar tarihsel; bid/ask 5 bps muhafazakâr proxy, haber erişimi yayın zamanı proxy'sidir. Resmî forward sayacına eklenmez.";
+    elements.replayModeNotice.textContent = "TARİHSEL CANLANDIRMA · Sandbox seçilen günün 1 dakikalık akışını gördü; motor yalnız 15 dakikalık düşünme anlarında çağrıldı. Bid/ask 5 bps muhafazakâr proxy, haber erişimi yayın zamanı proxy'sidir. Resmî forward sayacına eklenmez.";
   } else {
     elements.replayModeNotice.className = "replay-mode-notice full-pit";
     elements.replayModeNotice.textContent = "TAM POINT-IN-TIME · O anda gerçekten yakalanmış fiyat, bid/ask, haber, SEC ve takvim görüntüleri kullanıldı.";
@@ -628,7 +630,7 @@ async function runHistoricalDate() {
   }
   elements.historicalReplayButton.disabled = true;
   elements.historicalReplayButton.textContent = "19 seri ve bağlam yükleniyor…";
-  elements.replayDiagnostics.textContent = "Seçilen günün 19 piyasa serisi, haberleri, SEC kayıtları ve olay takvimi yükleniyor; motor zamanı 5'er dakika ilerletecek.";
+  elements.replayDiagnostics.textContent = "Seçilen günün 19 piyasa serisi, haberleri, SEC kayıtları ve olay takvimi yükleniyor; sandbox her dakikayı izleyecek, motor 15 dakikada bir düşünecek.";
   try {
     const response = await fetch("/api/historical-replay", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -662,7 +664,7 @@ function renderPaperPortfolio(portfolio) {
   elements.paperReturn.className = portfolio?.totalReturn > 0 ? "positive" : portfolio?.totalReturn < 0 ? "negative" : "muted-text";
   elements.paperTrades.textContent = `${portfolio?.executedTrades ?? 0} açıldı · ${portfolio?.skippedSignals ?? 0} pas geçildi`;
   elements.paperDrawdown.textContent = Number.isFinite(portfolio?.maxRealizedDrawdown) ? formatPercent(-portfolio.maxRealizedDrawdown * 100) : "—";
-  elements.paperExplanation.textContent = `${portfolio?.cadenceMinutes ?? 5} dakikada bir karar kontrolü · işlem başına %${portfolio?.settings?.riskPct ?? "—"} risk · tek pozisyonda en fazla %${portfolio?.settings?.maxPositionPct ?? "—"} kasa · ücret ve kayma dahil.`;
+  elements.paperExplanation.textContent = `Her mumu izler, ${portfolio?.cadenceMinutes ?? 15} dakikada bir düşünür · işlem başına %${portfolio?.settings?.riskPct ?? "—"} risk · tek pozisyonda en fazla %${portfolio?.settings?.maxPositionPct ?? "—"} kasa · ücret ve kayma dahil.`;
   elements.paperLedger.replaceChildren();
   elements.paperReviews.replaceChildren();
   if (!portfolio?.trades?.length) {

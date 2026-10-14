@@ -5,6 +5,7 @@ import { buildBacktestJournal } from "../lib/backtest-journal.mjs";
 const strategy = {
   barSeconds: 300,
   outcomeBarSeconds: 60,
+  decisionCadenceMinutes: 15,
   entryCaptureMaxDelaySeconds: 90,
   feeCasesUsd: [1, 3],
   slippageStressBpsPerSide: 5,
@@ -49,9 +50,9 @@ test("backtest defteri parametreleri, huni ve vaka sınıflarını üretir", () 
     generatedAt: "2026-10-13T15:00:00.000Z",
     engineVersion: "test",
     requested: { startAt: "2026-10-13T13:30:00.000Z", endAt: "2026-10-13T20:00:00.000Z" },
-    diagnostics: { fullPointInTimeSnapshots: 12 },
+    diagnostics: { fullPointInTimeSnapshots: 12, sandbox: { decisionCadenceMinutes: 15, observedSteps: 48, seenBarsBySymbol: { MU: 42, SNDK: 41 } } },
     summary: { independentSignals: 2 },
-    portfolio: { settings: { initialCapital: 10_000, riskPct: 1, maxPositionPct: 50 }, cadenceMinutes: 5, eligibleSignals: 2, executedTrades: 2, skippedSignals: 0 },
+    portfolio: { settings: { initialCapital: 10_000, riskPct: 1, maxPositionPct: 50 }, cadenceMinutes: 15, eligibleSignals: 2, executedTrades: 2, skippedSignals: 0 },
     trustReport: { level: "FULL_PIT", usableForOfficialForward: true, passedChecks: 6, totalChecks: 6, sourceLines: [], warnings: [] },
     integrityChecks: [{ name: "ok", passed: true }],
     rows: [
@@ -60,6 +61,9 @@ test("backtest defteri parametreleri, huni ve vaka sınıflarını üretir", () 
     ]
   }, strategy, "abc123");
   assert.equal(journal.runParameters.mechanics.featureBarSeconds, 300);
+  assert.equal(journal.runParameters.mechanics.decisionCadenceMinutes, 15);
+  assert.equal(journal.decisionFunnel.observedSteps, 48);
+  assert.equal(journal.decisionFunnel.observedBars, 42);
   assert.equal(journal.dataAudit.trustLevel, "FULL_PIT");
   assert.equal(journal.decisionFunnel.paperExecutedTrades, 2);
   assert.equal(journal.learningCases.length, 2);

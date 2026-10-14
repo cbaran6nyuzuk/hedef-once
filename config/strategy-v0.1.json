@@ -1,8 +1,9 @@
 {
-  "version": "0.2.1-forward-baseline",
+  "version": "0.2.2-sandbox-cadence",
   "mode": "RESEARCH_ONLY",
   "barSeconds": 300,
   "outcomeBarSeconds": 60,
+  "decisionCadenceMinutes": 15,
   "entryCaptureMaxDelaySeconds": 90,
   "researchNotionalUsd": 5000,
   "feeCasesUsd": [1.5, 3],
