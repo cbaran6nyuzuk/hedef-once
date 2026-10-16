@@ -153,3 +153,55 @@ test("canlı araştırma motoru olasılık uydurmaz", async () => {
   assert.ok(predictions.candidates.every((candidate) => candidate.timePolicy?.featureBarMinutes === 5));
   assert.ok(predictions.candidates.every((candidate) => candidate.timePolicy?.outcomeBarMinutes === 1));
 });
+
+test("ilk 30 dakikada yalnız gerçek veri eksikliği gösterilir ve sektör baskısı uyarı kalır", async () => {
+  const regularStart = Math.floor(new Date("2026-10-16T13:30:00.000Z").getTime() / 1000);
+  const observedAt = "2026-10-16T13:56:00.000Z";
+  const bars = Array.from({ length: 26 }, (_, index) => ({
+    timestamp: regularStart + index * 60,
+    open: 100, high: 100.1, low: 99.9, close: 100, volume: 1000
+  }));
+  const charts = ["MU", "SNDK"].map((symbol) => ({
+    symbol, bars, meta: { currentTradingPeriod: { regular: { start: regularStart, end: regularStart + 390 * 60 } } }
+  }));
+  const quote = { price: 100, vwap: 100, changePct: -1, marketState: "REGULAR" };
+  const snapshot = {
+    observedAt,
+    quotes: { MU: quote, SNDK: quote, QQQ: { changePct: -1 }, SPY: { changePct: -1 }, "^VIX": { changePct: 3 } },
+    execution: { MU: { ask: 100, spreadBps: 2, qualityStatus: "VALID" }, SNDK: { ask: 100, spreadBps: 2, qualityStatus: "VALID" } },
+    baskets: { memory: { state: "NEGATIVE", averageChangePct: -1, coverage: 1 }, sector: { state: "NEGATIVE", averageChangePct: -1, coverage: 1 } }
+  };
+  const context = { news: [], events: [], readiness: { newsConnected: true, calendarConnected: true } };
+  const predictions = await generatePredictions(snapshot, charts, context);
+  for (const candidate of predictions.candidates) {
+    assert.deepEqual(candidate.hardVetos, ["INSUFFICIENT_HISTORY"]);
+    assert.ok(candidate.softVetos.includes("SECTOR_BREAKDOWN"));
+    assert.ok(!candidate.hardVetos.includes("INVALID_STOP"));
+    assert.ok(!candidate.hardVetos.includes("RISK_REWARD_TOO_LOW"));
+  }
+});
+
+test("hızlı model üç mumluk stop oluşunca geniş modelden önce veri engelini kaldırır", async () => {
+  const regularStart = Math.floor(new Date("2026-10-16T13:30:00.000Z").getTime() / 1000);
+  const observedAt = "2026-10-16T14:01:00.000Z";
+  const bars = Array.from({ length: 31 }, (_, index) => {
+    const close = 100 + index * 0.005;
+    return { timestamp: regularStart + index * 60, open: close - 0.01, high: close + 0.05, low: close - 0.05, close, volume: 1000 };
+  });
+  const charts = ["MU", "SNDK"].map((symbol) => ({
+    symbol, bars, meta: { currentTradingPeriod: { regular: { start: regularStart, end: regularStart + 390 * 60 } } }
+  }));
+  const quote = { price: 100.15, vwap: 100.08, changePct: 0.2, marketState: "REGULAR" };
+  const snapshot = {
+    observedAt,
+    quotes: { MU: quote, SNDK: quote, QQQ: { changePct: 0.2 }, SPY: { changePct: 0.1 }, "^VIX": { changePct: -1 } },
+    execution: { MU: { ask: 100.16, spreadBps: 2, qualityStatus: "VALID" }, SNDK: { ask: 100.16, spreadBps: 2, qualityStatus: "VALID" } },
+    baskets: { memory: { state: "MIXED", averageChangePct: 0, coverage: 1 }, sector: { state: "MIXED", averageChangePct: 0, coverage: 1 } }
+  };
+  const context = { news: [], events: [], readiness: { newsConnected: true, calendarConnected: true } };
+  const predictions = await generatePredictions(snapshot, charts, context);
+  const quick = predictions.candidates.filter((candidate) => candidate.modelKey === "quick");
+  const extended = predictions.candidates.filter((candidate) => candidate.modelKey === "extended");
+  assert.ok(quick.every((candidate) => !candidate.hardVetos.includes("INSUFFICIENT_HISTORY")));
+  assert.ok(extended.every((candidate) => candidate.hardVetos.includes("INSUFFICIENT_HISTORY")));
+});

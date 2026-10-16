@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
+    "server:install": "powershell -ExecutionPolicy Bypass -File scripts/install-live-server-task.ps1",
     "collect": "node server.mjs --collect-once",
     "test": "node --test",
     "audit": "node scripts/audit-data.mjs",

@@ -31,6 +31,12 @@ let latestCharts = null;
 let latestBacktest = await buildForwardBacktestReport(dataDir, strategy.version);
 let collecting = null;
 let collectingContext = null;
+const decisionCadenceMs = (strategy.decisionCadenceMinutes ?? 15) * 60_000;
+const latestPredictionOnlyDelayed = latestPredictions?.candidates?.length
+  && latestPredictions.candidates.every((candidate) => candidate.hardVetos?.includes("DELAYED_DECISION_CAPTURE"));
+let lastPredictionBucket = latestPredictions?.generatedAt && !latestPredictionOnlyDelayed
+  ? Math.floor(new Date(latestPredictions.generatedAt).getTime() / decisionCadenceMs)
+  : null;
 
 async function refresh() {
   if (collecting) return collecting;
@@ -57,7 +63,12 @@ async function refresh() {
 
 async function refreshPredictions() {
   if (!latest || !latestCharts?.length) return latestPredictions;
+  const currentBucket = Math.floor(new Date(latest.observedAt).getTime() / decisionCadenceMs);
+  if (currentBucket === lastPredictionBucket) return latestPredictions;
   latestPredictions = await generatePredictions(latest, latestCharts, latestContext);
+  const onlyDelayed = latestPredictions.candidates?.length
+    && latestPredictions.candidates.every((candidate) => candidate.hardVetos?.includes("DELAYED_DECISION_CAPTURE"));
+  if (!onlyDelayed) lastPredictionBucket = currentBucket;
   await store.savePredictions(latestPredictions);
   await labelMaturedSignals(dataDir);
   latestBacktest = await buildForwardBacktestReport(dataDir, strategy.version);
@@ -108,7 +119,8 @@ function buildSystemStatus() {
   const marketFresh = Number.isFinite(marketAgeSeconds) && marketAgeSeconds <= 150 && Object.keys(latest?.quotes ?? {}).length === 19;
   const contextConnected = Boolean(latestContext?.readiness?.newsConnected && latestContext?.readiness?.filingsConnected && latestContext?.readiness?.calendarConnected);
   const contextFresh = contextConnected && Number.isFinite(contextAgeSeconds) && contextAgeSeconds <= CONTEXT_INTERVAL_MS / 1000 + 300;
-  const predictorCurrent = latestPredictions?.engineVersion === strategy.version && Number.isFinite(predictionAgeSeconds) && predictionAgeSeconds <= 150;
+  const predictorCurrent = latestPredictions?.engineVersion === strategy.version && Number.isFinite(predictionAgeSeconds)
+    && predictionAgeSeconds <= decisionCadenceMs / 1000 + 150;
   const marketState = latest?.quotes?.MU?.marketState ?? "UNKNOWN";
   const infrastructureReady = marketFresh && contextFresh && predictorCurrent;
   const state = !infrastructureReady ? "DEGRADED" : marketState === "REGULAR" ? "LIVE_AND_SCORING" : "CONNECTED_WAITING_SESSION";
@@ -128,7 +140,7 @@ function buildSystemStatus() {
     plainExplanation: !infrastructureReady
       ? "En az bir canlı veri veya motor katmanı güncel değil. Sinyale güvenme."
       : marketState === "REGULAR"
-        ? "Normal seans açık; motor yeni tamamlanan 5 dakikalık mumlarda karar arıyor."
+        ? `Normal seans açık; veri her dakika izleniyor ve motor ${strategy.decisionCadenceMinutes ?? 15} dakikada bir karar arıyor.`
         : `Bağlantılar güncel fakat piyasa ${marketState}. Normal seans açılana kadar sinyal üretilmemesi beklenen davranıştır.`
   };
 }

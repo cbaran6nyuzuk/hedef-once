@@ -30,7 +30,9 @@ const elements = Object.fromEntries([
   "paperReviews", "replayDay", "archiveCoverage", "historicalDate", "historicalReplayButton", "replayModeNotice",
   "replayTrust", "replayTrustTitle", "replayTrustBadge", "replayTrustPlain", "replayTruthList", "replayWarningList", "replayCheckList",
   "journalPanel", "journalTitle", "journalSaved", "journalRange", "journalRangeDetail", "journalParams", "journalParamDetail",
-  "journalFunnel", "journalFunnelDetail", "journalCases", "journalCaseDetail", "journalCaseList", "savedRunList"
+  "journalFunnel", "journalFunnelDetail", "journalCases", "journalCaseDetail", "journalCaseList", "savedRunList",
+  "opportunityAudit", "opportunityAuditTitle", "opportunityAuditBadge", "opportunityAuditExplanation",
+  "opportunityCorrectEntry", "opportunityMissed", "opportunityRapidMissed", "opportunityWrongEntry", "opportunityCorrectWait", "opportunityTopCause", "opportunityList"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -568,6 +570,7 @@ function renderReplay(report) {
   }
   renderReplayTrust(report);
   renderBacktestJournal(report);
+  renderOpportunityAudit(report.opportunityAudit);
   elements.replaySummary.hidden = false;
   elements.replayFullMoments.textContent = report.diagnostics.fullPointInTimeSnapshots.toLocaleString("tr-TR");
   elements.replayCandidates.textContent = report.candidates.toLocaleString("tr-TR");
@@ -612,6 +615,43 @@ function renderReplay(report) {
     elements.replayResults.append(item);
   }
   elements.replaySummary.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function renderOpportunityAudit(audit) {
+  if (!audit) {
+    elements.opportunityAudit.hidden = true;
+    return;
+  }
+  elements.opportunityAudit.hidden = false;
+  elements.opportunityAuditExplanation.textContent = `${audit.explanation} ${audit.benchmark}.`;
+  elements.opportunityCorrectEntry.textContent = audit.counts?.DOGRU_GIRIS ?? 0;
+  elements.opportunityMissed.textContent = audit.counts?.KACAN_FIRSAT ?? 0;
+  elements.opportunityRapidMissed.textContent = `${audit.counts?.HIZLI_KACAN_FIRSAT ?? 0} tanesi ${audit.rapidWindowMinutes ?? 30} dk içinde`;
+  elements.opportunityWrongEntry.textContent = audit.counts?.YANLIS_GIRIS ?? 0;
+  elements.opportunityCorrectWait.textContent = audit.counts?.DOGRU_BEKLEME ?? 0;
+  const top = audit.missedByCause?.[0];
+  elements.opportunityTopCause.textContent = top
+    ? `En sık kaçan fırsat nedeni: ${top.label} · ${top.count} karar.`
+    : "Bu testte benchmark'a göre kaçan +%1 fırsatı yok.";
+  const rows = [...(audit.comparisons ?? [])]
+    .sort((a, b) => Number(b.rapidOpportunity) - Number(a.rapidOpportunity) || Number(b.comparisonClass === "KACAN_FIRSAT") - Number(a.comparisonClass === "KACAN_FIRSAT") || new Date(a.decisionAt) - new Date(b.decisionAt))
+    .slice(0, 40);
+  const header = document.createElement("div");
+  header.className = "opportunity-row replay-result-head";
+  for (const label of ["Karar zamanı", "Hisse", "Motor", "Gerçekte", "Sonuç süresi", "Ana neden"]) {
+    const cell = document.createElement("span"); cell.textContent = label; header.append(cell);
+  }
+  elements.opportunityList.replaceChildren(header, ...rows.map((item) => {
+    const row = document.createElement("div");
+    row.className = `opportunity-row${item.comparisonClass === "KACAN_FIRSAT" ? " missed" : item.comparisonClass === "YANLIS_GIRIS" ? " wrong" : ""}`;
+    const outcome = item.rapidOpportunity && item.comparisonClass === "KACAN_FIRSAT"
+      ? "Hızlı kaçan fırsat"
+      : ({ DOGRU_GIRIS: "Doğru giriş", YANLIS_GIRIS: "Yanlış giriş", KACAN_FIRSAT: "Kaçan fırsat", DOGRU_BEKLEME: "Doğru bekleme" })[item.comparisonClass] ?? item.comparisonClass;
+    const values = [formatClock(item.decisionAt), item.symbol, item.motorDecision, outcome, `${item.timeToOutcomeMinutes} dk`, item.primaryCause?.label ?? "—"];
+    for (const value of values) { const cell = document.createElement("span"); cell.textContent = value; row.append(cell); }
+    row.title = `Giriş ${formatPrice(item.entryPrice)} · benchmark hedef ${formatPrice(item.benchmarkTargetPrice)} · benchmark stop ${formatPrice(item.benchmarkStopPrice)} · MFE ${formatPercent(item.mfePct)} · MAE ${formatPercent(item.maePct)}`;
+    return row;
+  }));
 }
 
 function paperSettings() {

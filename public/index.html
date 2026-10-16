@@ -261,6 +261,21 @@
             <div id="savedRunList"><p class="empty-state">Henüz kayıt yok.</p></div>
           </details>
         </section>
+        <section class="opportunity-audit" id="opportunityAudit" hidden aria-labelledby="opportunityAuditTitle">
+          <div class="opportunity-audit-head">
+            <div><span>KARAR KARŞILAŞTIRMASI</span><h3 id="opportunityAuditTitle">Motor ile gerçekleşen hareket</h3></div>
+            <strong id="opportunityAuditBadge">Gelecek sonucu yalnız denetimde</strong>
+          </div>
+          <p id="opportunityAuditExplanation">Test tamamlandığında motorun o anda verdiği karar ile sonradan gerçekleşen hedef/stop sırası karşılaştırılır.</p>
+          <div class="opportunity-summary">
+            <article><span>Doğru giriş</span><strong id="opportunityCorrectEntry">—</strong></article>
+            <article><span>Kaçan fırsat</span><strong id="opportunityMissed">—</strong><small id="opportunityRapidMissed">—</small></article>
+            <article><span>Yanlış giriş</span><strong id="opportunityWrongEntry">—</strong></article>
+            <article><span>Doğru bekleme</span><strong id="opportunityCorrectWait">—</strong></article>
+          </div>
+          <p id="opportunityTopCause">Kaçan fırsat nedeni testten sonra gösterilecek.</p>
+          <div class="opportunity-list" id="opportunityList"></div>
+        </section>
         <section class="paper-report" id="paperReport" hidden aria-labelledby="paperReportTitle">
           <div class="paper-report-head"><div><span>SANAL KASA</span><h3 id="paperReportTitle">Motorun para günlüğü</h3></div><strong id="paperReturn">—</strong></div>
           <div class="paper-summary">
