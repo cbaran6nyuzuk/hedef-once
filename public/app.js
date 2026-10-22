@@ -315,14 +315,31 @@ function renderScoreAudit(candidate) {
 function renderPrediction(predictions) {
   const candidate = predictions?.candidates?.find((item) => item.symbol === state.symbol && item.modelKey === state.model);
   if (!candidate) {
+    const marketState = state.snapshot?.quotes?.[state.symbol]?.marketState ?? "UNKNOWN";
+    const regular = marketState === "REGULAR";
+    const quick = state.model === "quick";
+    const waitMinutes = quick ? 15 : 30;
+    const sessionName = ({ PRE: "Seans öncesi", POST: "Seans sonrası", CLOSED: "Piyasa kapalı", UNKNOWN: "Seans bilinmiyor" })[marketState] ?? marketState;
+    elements.decisionTitle.textContent = regular ? "İlk karar mumu hazırlanıyor" : sessionName;
+    elements.decisionReason.textContent = regular
+      ? `${quick ? "Hızlı +%1" : "Geniş +%1,5"} motoru için tamamlanmış 5 dakikalık mumlar birikiyor. Açılıştan yaklaşık ${waitMinutes} dakika sonra ilk değerlendirme yapılır.`
+      : `Motor yalnız ABD normal seansında karar üretir. Seans açıldıktan sonra ${quick ? "3" : "6"} tamamlanmış 5 dakikalık mum beklenir.`;
     elements.decisionScore.textContent = "—";
     elements.tradeQualityScore.textContent = "—";
     elements.probabilityStatus.textContent = "Kalibrasyon bekliyor";
-    elements.signalTime.textContent = "Sinyal bekleniyor";
-    elements.timingStatus.textContent = "Bekleniyor";
+    elements.signalTime.textContent = regular ? "İlk tamamlanmış karar seti bekleniyor" : `${sessionName} · karar motoru duraklatıldı`;
+    elements.timingStatus.textContent = regular ? "Mum birikiyor" : sessionName;
+    elements.timingStatus.className = "warning-text";
     elements.riskStatus.textContent = "—";
     elements.scoreGrid.replaceChildren();
-    renderGuidance(null);
+    renderGuidance({ userGuidance: {
+      action: "İşlem açma",
+      tone: "STOP",
+      summary: regular ? `İlk güvenilir değerlendirme için yaklaşık ${waitMinutes} dakikalık açılış verisi gerekiyor.` : "Normal seans açılmadan bu stratejinin kararı geçerli değildir.",
+      waitFor: regular
+        ? [`${quick ? "3" : "6"} tamamlanmış 5 dakikalık mum oluşsun.`, "Bir sonraki 15 dakikalık düşünme anını bekle."]
+        : ["ABD normal seansı açılsın.", `Açılıştan sonra yaklaşık ${waitMinutes} dakika veri biriksin.`]
+    } });
     renderCycle(null);
     renderMotorEvidence(null);
     renderScoreAudit(null);

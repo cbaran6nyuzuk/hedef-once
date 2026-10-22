@@ -171,7 +171,7 @@ async function serveStatic(requestPath, response) {
   try {
     const info = await stat(resolved);
     if (!info.isFile()) throw new Error("Dosya değil");
-    response.writeHead(200, { "Content-Type": contentTypes[path.extname(resolved)] ?? "application/octet-stream" });
+    response.writeHead(200, { "Content-Type": contentTypes[path.extname(resolved)] ?? "application/octet-stream", "Cache-Control": "no-store" });
     response.end(await readFile(resolved));
   } catch {
     sendJson(response, 404, { error: "Bulunamadı" });

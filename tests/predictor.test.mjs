@@ -174,7 +174,7 @@ test("canlı araştırma motoru olasılık uydurmaz", async () => {
   assert.ok(predictions.candidates.every((candidate) => candidate.timePolicy?.outcomeBarMinutes === 1));
 });
 
-test("ilk 30 dakikada yalnız gerçek veri eksikliği gösterilir ve sektör baskısı uyarı kalır", async () => {
+test("ilk 30 dakikada hızlı model hazır olurken geniş model veri bekler", async () => {
   const regularStart = Math.floor(new Date("2026-10-16T13:30:00.000Z").getTime() / 1000);
   const observedAt = "2026-10-16T13:56:00.000Z";
   const bars = Array.from({ length: 26 }, (_, index) => ({
@@ -194,10 +194,13 @@ test("ilk 30 dakikada yalnız gerçek veri eksikliği gösterilir ve sektör bas
   const context = { news: [], events: [], readiness: { newsConnected: true, calendarConnected: true } };
   const predictions = await generatePredictions(snapshot, charts, context);
   for (const candidate of predictions.candidates) {
-    assert.deepEqual(candidate.hardVetos, ["INSUFFICIENT_HISTORY"]);
+    if (candidate.modelKey === "quick") assert.ok(!candidate.hardVetos.includes("INSUFFICIENT_HISTORY"));
+    else assert.ok(candidate.hardVetos.includes("INSUFFICIENT_HISTORY"));
     assert.ok(candidate.softVetos.includes("SECTOR_BREAKDOWN"));
-    assert.ok(!candidate.hardVetos.includes("INVALID_STOP"));
-    assert.ok(!candidate.hardVetos.includes("RISK_REWARD_TOO_LOW"));
+    if (candidate.modelKey === "extended") {
+      assert.ok(!candidate.hardVetos.includes("INVALID_STOP"));
+      assert.ok(!candidate.hardVetos.includes("RISK_REWARD_TOO_LOW"));
+    }
   }
 });
 

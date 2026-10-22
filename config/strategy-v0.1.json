@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0-predictive-evidence",
+  "version": "0.3.1-fast-open-readiness",
   "mode": "RESEARCH_ONLY",
   "barSeconds": 300,
   "outcomeBarSeconds": 60,
@@ -25,6 +25,7 @@
   "models": {
     "quick": {
       "label": "Hızlı +1",
+      "minimumFeatureBars": 3,
       "targetPct": 0.01,
       "minStopPct": 0.0045,
       "maxStopPct": 0.0085,
@@ -34,6 +35,7 @@
     },
     "extended": {
       "label": "Geniş +1,5",
+      "minimumFeatureBars": 6,
       "targetPct": 0.015,
       "minStopPct": 0.0065,
       "maxStopPct": 0.0115,
