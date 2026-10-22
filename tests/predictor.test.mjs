@@ -174,6 +174,26 @@ test("canlı araştırma motoru olasılık uydurmaz", async () => {
   assert.ok(predictions.candidates.every((candidate) => candidate.timePolicy?.outcomeBarMinutes === 1));
 });
 
+test("seans öncesinde boş liste yerine açık engel kararı üretilir", async () => {
+  const observedAt = "2026-10-22T10:45:00.000Z";
+  const regularStart = Math.floor(new Date("2026-10-22T13:30:00.000Z").getTime() / 1000);
+  const charts = ["MU", "SNDK"].map((symbol) => ({
+    symbol, bars: [], meta: { currentTradingPeriod: { regular: { start: regularStart, end: regularStart + 390 * 60 } } }
+  }));
+  const quote = { price: 100, vwap: 100, changePct: 0.2, marketState: "PRE" };
+  const snapshot = {
+    observedAt,
+    quotes: { MU: quote, SNDK: quote, QQQ: { changePct: 0 }, SPY: { changePct: 0 }, "^VIX": { changePct: 0 } },
+    execution: { MU: { ask: 100, spreadBps: 2, qualityStatus: "VALID" }, SNDK: { ask: 100, spreadBps: 2, qualityStatus: "VALID" } },
+    baskets: { memory: { state: "MIXED", averageChangePct: 0, coverage: 1 }, sector: { state: "MIXED", averageChangePct: 0, coverage: 1 } }
+  };
+  const context = { news: [], events: [], readiness: { newsConnected: true, calendarConnected: true } };
+  const predictions = await generatePredictions(snapshot, charts, context);
+  assert.equal(predictions.candidates.length, 4);
+  assert.ok(predictions.candidates.every((candidate) => candidate.signalWindow === "BLOCKED"));
+  assert.ok(predictions.candidates.every((candidate) => candidate.hardVetos[0] === "OUTSIDE_REGULAR_SESSION"));
+});
+
 test("ilk 30 dakikada hızlı model hazır olurken geniş model veri bekler", async () => {
   const regularStart = Math.floor(new Date("2026-10-16T13:30:00.000Z").getTime() / 1000);
   const observedAt = "2026-10-16T13:56:00.000Z";

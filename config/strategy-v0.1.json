@@ -1,5 +1,5 @@
 {
-  "version": "0.3.1-fast-open-readiness",
+  "version": "0.3.2-session-state-candidates",
   "mode": "RESEARCH_ONLY",
   "barSeconds": 300,
   "outcomeBarSeconds": 60,
