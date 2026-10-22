@@ -1,5 +1,5 @@
 {
-  "version": "0.2.4-opportunity-audit",
+  "version": "0.3.0-predictive-evidence",
   "mode": "RESEARCH_ONLY",
   "barSeconds": 300,
   "outcomeBarSeconds": 60,
@@ -11,15 +11,17 @@
   "maxSpreadBps": 10,
   "openChaosMinutes": 10,
   "weights": {
-    "priceVolume": 35,
-    "volatilityTime": 20,
-    "sectorBasket": 7,
-    "newsEvent": 3,
-    "targetStop": 20,
-    "macro": 3,
-    "execution": 10,
-    "crowdedRisk": 2
+    "priceVolume": 50,
+    "volatilityTime": 15,
+    "sectorBasket": 15,
+    "newsEvent": 5,
+    "targetStop": 0,
+    "macro": 10,
+    "execution": 0,
+    "crowdedRisk": 5
   },
+  "scoreSemantics": "UNCALIBRATED_PREDICTIVE_EVIDENCE",
+  "tradeQualityWeights": { "targetStop": 60, "execution": 40 },
   "models": {
     "quick": {
       "label": "Hızlı +1",

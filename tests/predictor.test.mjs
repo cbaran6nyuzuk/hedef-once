@@ -5,6 +5,7 @@ import { evaluateTargetBeforeStop } from "../lib/evaluator.mjs";
 import { resolveDeadline, validSignalGeometry } from "../lib/labeler.mjs";
 import { chartAt, contextReady, latestAtOrBefore, primaryRows } from "../lib/replay.mjs";
 import { generatePredictions } from "../lib/predictor.mjs";
+import { classifyNewsHeadline } from "../lib/news.mjs";
 
 test("tamamlanmamış 5 dakikalık bar feature'a girmez", () => {
   const bars = Array.from({ length: 11 }, (_, index) => ({
@@ -33,6 +34,23 @@ test("satış sonrası güçlü 5 dakikalık dönüş yakın giriş tetiği say�
   const timing = classifyEntryTiming(bars, 100.4, 0.01);
   assert.equal(timing.state, "REVERSAL_TRIGGER");
   assert.ok(timing.score >= 80);
+});
+
+test("kovalama sınırı hedef modeline göre değişir", () => {
+  const bars = Array.from({ length: 8 }, (_, index) => ({
+    timestamp: 1_000 + index * 300, open: index === 7 ? 100 : 99.98, high: index === 7 ? 101.08 : 100.05,
+    low: 99.95, close: index === 7 ? 101 : 100, volume: 1_000
+  }));
+  const quick = classifyEntryTiming(bars, 100, 0.01);
+  const extended = classifyEntryTiming(bars, 100, 0.015);
+  assert.equal(quick.state, "CHASING");
+  assert.notEqual(extended.state, "CHASING");
+});
+
+test("haber başlığı yalnız açık yön ifadesi varsa sınıflanır", () => {
+  assert.equal(classifyNewsHeadline("Micron raises guidance on strong demand").direction, "POSITIVE");
+  assert.equal(classifyNewsHeadline("Chip maker cuts guidance after weak demand").direction, "NEGATIVE");
+  assert.equal(classifyNewsHeadline("Micron Technology shares in focus today").direction, "UNKNOWN");
 });
 
 test("aynı barda hedef ve stop teması konservatif olarak stop sayılır", () => {
@@ -138,6 +156,8 @@ test("canlı araştırma motoru olasılık uydurmaz", async () => {
   const predictions = await generatePredictions(snapshot, charts, context);
   assert.equal(predictions.candidates.length, 4);
   assert.ok(predictions.candidates.every((candidate) => candidate.pTargetFirst === null));
+  assert.ok(predictions.candidates.every((candidate) => candidate.scoreSemantics === "UNCALIBRATED_PREDICTIVE_EVIDENCE"));
+  assert.ok(predictions.candidates.every((candidate) => Number.isFinite(candidate.tradeQualityScore)));
   assert.ok(predictions.candidates.every((candidate) => candidate.mode === "RESEARCH_ONLY"));
   assert.ok(predictions.candidates.every((candidate) => candidate.userGuidance?.action));
   assert.ok(predictions.candidates.every((candidate) => Array.isArray(candidate.userGuidance?.waitFor)));

@@ -63,7 +63,8 @@
           <span id="dataCoverage">Fiyat kapsamı: —</span>
           <span>Giriş penceresi: <b id="timingStatus">—</b></span>
           <span>Taktik risk: <b id="riskStatus">—</b></span>
-          <span>Araştırma skoru: <b id="decisionScore">—</b></span>
+          <span>Tahmin kanıtı: <b id="decisionScore">—</b></span>
+          <span>İşlem kalitesi: <b id="tradeQualityScore">—</b></span>
           <span>Olasılık: <b id="probabilityStatus">Kalibrasyon bekliyor</b></span>
         </div>
       </section>
@@ -161,16 +162,16 @@
             <article><span>BAĞLAM</span><strong>Sektör, makro ve haber</strong><p>Bunlar riski büyütür veya küçültür. Güçlü mikro dönüşü tek başına yok saymaz; kesin engel varsa işlem kilitlenir.</p></article>
           </div>
 
-          <h3>Karar ağırlıkları</h3>
+          <h3>Tahmin kanıtı ağırlıkları</h3>
           <div class="weight-grid">
-            <div><b>%35</b><span>Giriş zamanlaması<small>Döngünün doğru anında mıyız?</small></span></div>
-            <div><b>%20</b><span>Hedef süresi<small>+%1 makul sürede gelebilir mi?</small></span></div>
-            <div><b>%20</b><span>Hedef / stop<small>Alınan risk ödüle değer mi?</small></span></div>
-            <div><b>%10</b><span>Giriş kalitesi<small>Spread ve uygulanabilir fiyat</small></span></div>
-            <div><b>%7</b><span>Memory / sektör<small>Benzer varlıklar destekliyor mu?</small></span></div>
-            <div><b>%3</b><span>Haber / olay<small>Yakın şok riski var mı?</small></span></div>
-            <div><b>%3</b><span>Genel piyasa<small>QQQ, SPY ve VIX bağlamı</small></span></div>
-            <div><b>%2</b><span>Yorgunluk riski<small>Hareketin çoğu geçmiş mi?</small></span></div>
+            <div><b>%50</b><span>Giriş zamanlaması<small>Döngünün doğru anında mıyız?</small></span></div>
+            <div><b>%15</b><span>Hedef süresi<small>Seçili hedef makul sürede gelebilir mi?</small></span></div>
+            <div><b>%15</b><span>Memory / sektör<small>Benzer varlıklar destekliyor mu?</small></span></div>
+            <div><b>%10</b><span>Genel piyasa<small>QQQ, SPY ve VIX bağlamı</small></span></div>
+            <div><b>%5</b><span>Haber yönü<small>Başlıkta ölçülebilen yön var mı?</small></span></div>
+            <div><b>%5</b><span>Yorgunluk riski<small>Günlük hareket aşırı mı?</small></span></div>
+            <div><b>%0</b><span>Hedef / stop<small>Ayrı işlem kalitesi hesabında</small></span></div>
+            <div><b>%0</b><span>Giriş kalitesi<small>Ayrı işlem kalitesi hesabında</small></span></div>
           </div>
 
           <h3>Bu kararda kullanılan gerçek ölçümler</h3>
@@ -196,7 +197,7 @@
           </div>
           <div class="model-boundary">
             <strong>Ağırlıkların şu anki durumu</strong>
-            <p>%35, %20 gibi ağırlıklar dondurulmuş başlangıç hipotezidir. Katman ölçekleri, birbiriyle ilişkili girdiler ve hem puanda hem engelde sayılan ölçüler forward testte ayrı ayrı sınanacaktır; şimdilik “doğru olasılık” anlamına gelmez.</p>
+            <p>Tahmin kanıtı yalnız yön ve hedef kapasitesini toplar. Stop, risk/getiri ve spread ayrı işlem kalitesinde ölçülür; toplam tahmin puanına ikinci kez eklenmez. Ağırlıklar yine dondurulmuş başlangıç hipotezidir ve “doğru olasılık” anlamına gelmez.</p>
           </div>
         </div>
       </details>
@@ -275,6 +276,33 @@
           </div>
           <p id="opportunityTopCause">Kaçan fırsat nedeni testten sonra gösterilecek.</p>
           <div class="opportunity-list" id="opportunityList"></div>
+        </section>
+        <section class="score-proof" id="scoreProof" aria-labelledby="scoreProofTitle">
+          <div class="score-proof-head">
+            <div><span>PUAN KANITI</span><h3 id="scoreProofTitle">Hangi puan gerçekten çalışıyor?</h3></div>
+            <strong id="scoreProofBadge">Kanıt hesaplanıyor</strong>
+          </div>
+          <p id="scoreProofExplanation">Aynı motor sürümünün olgunlaşmış sonuçları puan aralıklarına ayrılıyor.</p>
+          <div class="score-probe">
+            <label><span>Kontrol etmek istediğin puan</span><input id="scoreProbe" type="number" min="0" max="100" step="1" value="56"></label>
+            <div><strong id="scoreProbeResult">56 puanın sonucu hesaplanıyor</strong><p id="scoreProbeDetail">Bu puanın bulunduğu aralık ayrıca gösterilecek.</p></div>
+          </div>
+          <div class="score-proof-stats">
+            <article><span>Resmî FULL_PIT gün</span><strong id="scoreOfficialDays">—</strong></article>
+            <article><span>Resmî olgun sonuç</span><strong id="scoreOfficialSamples">—</strong></article>
+            <article><span>Seçili model örneği</span><strong id="scoreModelSamples">—</strong></article>
+            <article><span>Kanıt için gereken</span><strong id="scoreMinimum">—</strong></article>
+          </div>
+          <div class="score-proof-table" id="scoreBandTable"></div>
+          <details class="score-thresholds">
+            <summary>Puan eşiği karşılaştırması</summary>
+            <div id="scoreThresholdTable"></div>
+          </details>
+          <details class="score-preliminary">
+            <summary>Tarihsel canlandırmadan gelen ön bulgu</summary>
+            <p id="scorePreliminaryExplanation">Bu bölüm araştırma içindir; canlıyla aynı resmî kanıt sayılmaz.</p>
+            <div id="scorePreliminaryTable"></div>
+          </details>
         </section>
         <section class="paper-report" id="paperReport" hidden aria-labelledby="paperReportTitle">
           <div class="paper-report-head"><div><span>SANAL KASA</span><h3 id="paperReportTitle">Motorun para günlüğü</h3></div><strong id="paperReturn">—</strong></div>

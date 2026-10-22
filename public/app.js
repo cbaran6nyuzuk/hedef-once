@@ -3,13 +3,14 @@ const state = {
   model: "quick",
   snapshot: null,
   loading: false,
-  replayAvailability: null
+  replayAvailability: null,
+  scoreCalibration: null
 };
 
 const elements = Object.fromEntries([
   "connectionDot", "marketState", "sourceNotice", "decisionTitle", "decisionReason", "selectedSymbol",
   "livePrice", "dayChange", "lastMarketTime", "dataDelay", "dataCoverage", "entryValue", "targetValue",
-  "timeValue", "decisionScore", "probabilityStatus", "quoteSubtitle", "metricChange", "metricVwap", "metricRange", "metricVolume", "memoryState",
+  "timeValue", "decisionScore", "tradeQualityScore", "probabilityStatus", "quoteSubtitle", "metricChange", "metricVwap", "metricRange", "metricVolume", "memoryState",
   "metricBidAsk", "metricSpread", "sectorState", "vetoText", "priceLayer", "newsLayer", "calendarLayer",
   "executionLayer", "stopValue", "netTargetValue", "modelLayer", "signalTime", "scoreGrid", "hardVetoList",
   "softVetoList", "observedAt", "quoteGrid", "newsObservedAt", "newsList", "eventList", "refreshButton",
@@ -32,7 +33,10 @@ const elements = Object.fromEntries([
   "journalPanel", "journalTitle", "journalSaved", "journalRange", "journalRangeDetail", "journalParams", "journalParamDetail",
   "journalFunnel", "journalFunnelDetail", "journalCases", "journalCaseDetail", "journalCaseList", "savedRunList",
   "opportunityAudit", "opportunityAuditTitle", "opportunityAuditBadge", "opportunityAuditExplanation",
-  "opportunityCorrectEntry", "opportunityMissed", "opportunityRapidMissed", "opportunityWrongEntry", "opportunityCorrectWait", "opportunityTopCause", "opportunityList"
+  "opportunityCorrectEntry", "opportunityMissed", "opportunityRapidMissed", "opportunityWrongEntry", "opportunityCorrectWait", "opportunityTopCause", "opportunityList",
+  "scoreProof", "scoreProofBadge", "scoreProofExplanation", "scoreProbe", "scoreProbeResult", "scoreProbeDetail",
+  "scoreOfficialDays", "scoreOfficialSamples", "scoreModelSamples", "scoreMinimum", "scoreBandTable", "scoreThresholdTable",
+  "scorePreliminaryExplanation", "scorePreliminaryTable"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -312,6 +316,7 @@ function renderPrediction(predictions) {
   const candidate = predictions?.candidates?.find((item) => item.symbol === state.symbol && item.modelKey === state.model);
   if (!candidate) {
     elements.decisionScore.textContent = "—";
+    elements.tradeQualityScore.textContent = "—";
     elements.probabilityStatus.textContent = "Kalibrasyon bekliyor";
     elements.signalTime.textContent = "Sinyal bekleniyor";
     elements.timingStatus.textContent = "Bekleniyor";
@@ -330,6 +335,7 @@ function renderPrediction(predictions) {
     : candidate.signalWindow === "NOW" ? candidate.timingReasons?.[0] ?? "Kısa vadeli giriş tetiği oluştu."
       : candidate.softVetos.length ? vetoLabels[candidate.softVetos[0]] ?? candidate.softVetos[0] : "Araştırma kuralları olumlu.";
   elements.decisionScore.textContent = `${candidate.decisionScore}/100`;
+  elements.tradeQualityScore.textContent = Number.isFinite(candidate.tradeQualityScore) ? `${candidate.tradeQualityScore}/100` : "—";
   elements.probabilityStatus.textContent = "Henüz üretilmiyor";
   elements.timingStatus.textContent = ({ NOW: "Açık", PREPARE: "Hazırlanıyor", WAIT: "Kapalı", BLOCKED: "Engelli" })[candidate.signalWindow] ?? "—";
   elements.riskStatus.textContent = ({ LOW: "Düşük", MEDIUM: "Orta", HIGH: "Yüksek" })[candidate.riskLevel] ?? "—";
@@ -529,6 +535,81 @@ async function loadSavedRuns() {
   }
 }
 
+function calibrationPercent(value) {
+  return Number.isFinite(value) ? `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(value * 100)}` : "—";
+}
+
+function scoreRows(items, selectedScore, firstLabel) {
+  const header = document.createElement("div");
+  header.className = "score-proof-row head";
+  for (const label of [firstLabel, "Örnek", "Hedef önce", "%95 güven aralığı", "Ort. net"]) {
+    const cell = document.createElement("span"); cell.textContent = label; header.append(cell);
+  }
+  return [header, ...items.map((item) => {
+    const row = document.createElement("div");
+    const contains = Number.isFinite(selectedScore) && Number.isFinite(item.minimum)
+      ? selectedScore >= item.minimum && selectedScore <= item.maximum
+      : Number.isFinite(selectedScore) && Number.isFinite(item.threshold) && selectedScore >= item.threshold;
+    row.className = `score-proof-row${contains ? " selected" : ""}`;
+    const confidence = item.samples
+      ? `${calibrationPercent(item.confidence95?.low)} – ${calibrationPercent(item.confidence95?.high)}`
+      : "—";
+    const values = [item.label ?? `≥ ${item.threshold}`, String(item.samples), calibrationPercent(item.targetFirstRate), confidence, calibrationPercent(item.averageNetReturn)];
+    for (const value of values) { const cell = document.createElement("span"); cell.textContent = value; row.append(cell); }
+    return row;
+  })];
+}
+
+function selectedCalibrationModel(section) {
+  return section?.models?.find((model) => model.modelKey === state.model);
+}
+
+function renderScoreCalibration() {
+  const calibration = state.scoreCalibration;
+  if (!calibration) return;
+  const official = calibration.official;
+  const preliminary = calibration.preliminary;
+  const model = selectedCalibrationModel(official);
+  const preliminaryModel = selectedCalibrationModel(preliminary);
+  const score = Math.min(100, Math.max(0, Number(elements.scoreProbe.value)));
+  const band = model?.bands?.find((item) => score >= item.minimum && score <= item.maximum);
+  const preliminaryBand = preliminaryModel?.bands?.find((item) => score >= item.minimum && score <= item.maximum);
+  const ready = official.status === "THRESHOLD_EVIDENCE_READY";
+  elements.scoreProofBadge.textContent = ready ? "Eşik kanıtı hazır" : "Henüz kanıtlanmadı";
+  elements.scoreProofBadge.className = ready ? "positive" : "warning-text";
+  elements.scoreProofExplanation.textContent = `${official.plainStatus} Buradaki başarı oranı, hedefin stop veya süre sonundan önce gelme oranıdır; puanın kendisi olasılık değildir. ${official.independenceRule}`;
+  elements.scoreOfficialDays.textContent = `${official.observedDays} / ${official.minimumProof.fullPitDays}`;
+  elements.scoreOfficialSamples.textContent = official.maturedSamples.toLocaleString("tr-TR");
+  elements.scoreModelSamples.textContent = `${state.model === "quick" ? "+%1 Quick" : "+%1,5 Extended"} · ${model?.total ?? 0}`;
+  elements.scoreMinimum.textContent = `${official.minimumProof.maturedPerModel} / model`;
+  if (band?.samples) {
+    elements.scoreProbeResult.textContent = `${score} puan · ${band.label} bandında ${band.targetFirst}/${band.samples} hedef önce`;
+    elements.scoreProbeDetail.textContent = `Gözlenen oran ${calibrationPercent(band.targetFirstRate)}, %95 güven aralığı ${calibrationPercent(band.confidence95.low)}–${calibrationPercent(band.confidence95.high)}. ${band.samples < 20 ? "Örnek az olduğu için bu sonuç eşik kanıtı değildir." : "Bu bant asgari örnek sayısına ulaştı."}`;
+  } else {
+    elements.scoreProbeResult.textContent = `${score} puan için resmî olgun sonuç yok`;
+    elements.scoreProbeDetail.textContent = preliminaryBand?.samples
+      ? `Tarihsel ön bulguda ${preliminaryBand.targetFirst}/${preliminaryBand.samples} hedef önce görüldü; resmî karar için FULL_PIT örnek bekleniyor.`
+      : "Bu puanın bulunduğu bantta henüz değerlendirilebilir örnek oluşmadı.";
+  }
+  elements.scoreBandTable.replaceChildren(...scoreRows(model?.bands ?? [], score, "Puan bandı"));
+  elements.scoreThresholdTable.replaceChildren(...scoreRows(model?.thresholds ?? [], score, "En az puan"));
+  elements.scorePreliminaryExplanation.textContent = `Aynı v${calibration.engineVersion} motoruyla tarihsel olarak yeniden kurulan ${preliminary.observedDays} gün ve seçili modelde ${preliminaryModel?.total ?? 0} olgun sonuç var. Proxy veri içerdiği için yalnız ön bulgudur.`;
+  elements.scorePreliminaryTable.replaceChildren(...scoreRows(preliminaryModel?.bands ?? [], score, "Puan bandı"));
+}
+
+async function loadScoreCalibration() {
+  try {
+    const response = await fetch("/api/score-calibration");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    state.scoreCalibration = payload;
+    renderScoreCalibration();
+  } catch (error) {
+    elements.scoreProofBadge.textContent = "Kalibrasyon alınamadı";
+    elements.scoreProofExplanation.textContent = error.message;
+  }
+}
+
 async function loadReplayAvailability() {
   try {
     const response = await fetch("/api/replay/availability");
@@ -679,7 +760,7 @@ async function runHistoricalDate() {
     const report = await response.json();
     if (!response.ok) throw new Error(report.error);
     renderReplay(report);
-    await loadSavedRuns();
+    await Promise.all([loadSavedRuns(), loadScoreCalibration()]);
   } catch (error) {
     elements.replayDiagnostics.textContent = error.message;
   } finally {
@@ -807,7 +888,7 @@ async function runReplay() {
     const report = await response.json();
     if (!response.ok) throw new Error(report.error);
     renderReplay(report);
-    await loadSavedRuns();
+    await Promise.all([loadSavedRuns(), loadScoreCalibration()]);
   } catch (error) {
     elements.replayDiagnostics.textContent = error.message;
   } finally {
@@ -879,6 +960,7 @@ function renderSelection() {
   elements.selectedSymbol.textContent = state.symbol;
   elements.targetValue.textContent = state.model === "quick" ? "+%1" : "+%1,5";
   elements.timeValue.textContent = state.model === "quick" ? "Aynı seans" : "1–3 seans";
+  renderScoreCalibration();
 }
 
 function renderQuoteGrid(snapshot) {
@@ -1006,6 +1088,7 @@ elements.replayButton.addEventListener("click", runReplay);
 elements.replayPresetButton.addEventListener("click", async () => { applyAvailableReplayRange(); await runReplay(); });
 elements.replayDay.addEventListener("change", applyAvailableReplayRange);
 elements.historicalReplayButton.addEventListener("click", runHistoricalDate);
+elements.scoreProbe.addEventListener("input", renderScoreCalibration);
 const historicalToday = new Date();
 const historicalMin = new Date(historicalToday); historicalMin.setUTCDate(historicalMin.getUTCDate() - 29);
 const historicalDefault = new Date(historicalToday); historicalDefault.setUTCDate(historicalDefault.getUTCDate() - 1);
@@ -1014,5 +1097,5 @@ elements.historicalDate.max = historicalDefault.toISOString().slice(0, 10);
 elements.historicalDate.min = historicalMin.toISOString().slice(0, 10);
 elements.historicalDate.value = historicalDefault.toISOString().slice(0, 10);
 renderSelection();
-await Promise.all([loadSnapshot(), loadReplayAvailability(), loadSavedRuns()]);
+await Promise.all([loadSnapshot(), loadReplayAvailability(), loadSavedRuns(), loadScoreCalibration()]);
 setInterval(() => loadSnapshot(), 60_000);

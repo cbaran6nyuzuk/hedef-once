@@ -13,6 +13,7 @@ import { getReplayAvailability, runPointInTimeReplay } from "./lib/replay.mjs";
 import { runHistoricalReplay } from "./lib/historical-replay.mjs";
 import { listBacktestRuns, saveBacktestRun } from "./lib/backtest-journal.mjs";
 import { PointInTimeStore } from "./lib/store.mjs";
+import { loadScoreCalibration } from "./lib/score-calibration.mjs";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(rootDir, "public");
@@ -20,8 +21,11 @@ const dataDir = path.join(rootDir, "data");
 const store = new PointInTimeStore(dataDir);
 await store.init();
 const strategy = JSON.parse(await readFile(path.join(rootDir, "config", "strategy-v0.1.json"), "utf8"));
-const predictorSource = await readFile(path.join(rootDir, "lib", "predictor.mjs"), "utf8");
-const engineFingerprint = createHash("sha256").update(`${JSON.stringify(strategy)}\n${predictorSource}`).digest("hex").slice(0, 12);
+const engineSourceFiles = ["predictor.mjs", "features.mjs", "news.mjs", "evaluator.mjs", "labeler.mjs"];
+const engineSources = await Promise.all(engineSourceFiles.map((file) => readFile(path.join(rootDir, "lib", file), "utf8")));
+const engineFingerprint = createHash("sha256")
+  .update(`${JSON.stringify(strategy)}\n${engineSources.join("\n---engine-file---\n")}`)
+  .digest("hex").slice(0, 12);
 
 let latest = await store.loadLatest();
 let latestContext = await store.loadLatestContext();
@@ -107,6 +111,7 @@ const contentTypes = {
 };
 
 function sendJson(response, status, value) {
+  if (response.writableEnded) return;
   response.writeHead(status, { "Content-Type": contentTypes[".json"], "Cache-Control": "no-store" });
   response.end(JSON.stringify(value));
 }
@@ -173,7 +178,7 @@ async function serveStatic(requestPath, response) {
   }
 }
 
-const server = createServer(async (request, response) => {
+async function handleRequest(request, response) {
   const url = new URL(request.url, "http://127.0.0.1");
   if (url.pathname === "/api/health") {
     const system = buildSystemStatus();
@@ -206,6 +211,11 @@ const server = createServer(async (request, response) => {
   }
   if (url.pathname === "/api/backtest-runs") {
     try { sendJson(response, 200, { runs: await listBacktestRuns(dataDir) }); }
+    catch (error) { sendJson(response, 500, { error: error.message }); }
+    return;
+  }
+  if (url.pathname === "/api/score-calibration") {
+    try { sendJson(response, 200, await loadScoreCalibration(dataDir, strategy.version)); }
     catch (error) { sendJson(response, 500, { error: error.message }); }
     return;
   }
@@ -242,6 +252,29 @@ const server = createServer(async (request, response) => {
     return;
   }
   await serveStatic(url.pathname, response);
+}
+
+const server = createServer((request, response) => {
+  handleRequest(request, response).catch((error) => {
+    console.error(`[${new Date().toISOString()}] İstek işleme hatası:`, error?.stack ?? error);
+    if (!response.headersSent) sendJson(response, 500, { error: "Beklenmeyen sunucu hatası. Canlı toplama devam ediyor." });
+    else if (!response.writableEnded) response.end();
+  });
+});
+
+server.on("clientError", (error, socket) => {
+  console.warn(`[${new Date().toISOString()}] Geçersiz istemci isteği: ${error.message}`);
+  if (socket.writable) socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error(`[${new Date().toISOString()}] Yakalanmamış promise hatası:`, reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error(`[${new Date().toISOString()}] Kritik süreç hatası; görev yöneticisi yeniden başlatacak:`, error?.stack ?? error);
+  server.close(() => process.exit(1));
+  setTimeout(() => process.exit(1), 3_000).unref();
 });
 
 const port = Number(process.env.PORT ?? 4173);

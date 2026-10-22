@@ -13,7 +13,10 @@ if (!availability.fullPitStart || !availability.fullPitEnd) {
   process.exit(0);
 }
 
-const report = await runPointInTimeReplay(dataDir, strategy, { startAt: availability.fullPitStart, endAt: availability.fullPitEnd });
+const latestDay = availability.fullPitDays?.at(-1);
+const auditStart = latestDay?.startAt ?? availability.fullPitStart;
+const auditEnd = latestDay?.endAt ?? availability.fullPitEnd;
+const report = await runPointInTimeReplay(dataDir, strategy, { startAt: auditStart, endAt: auditEnd });
 const failed = report.integrityChecks.filter((check) => !check.passed);
 const audit = {
   status: failed.length ? "FAIL" : "PASS",
