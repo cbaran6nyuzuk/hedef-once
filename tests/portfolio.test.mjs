@@ -43,3 +43,19 @@ test("risk bütçesi, pozisyon tavanı ve gerçek maliyet kasaya uygulanır", ()
   assert.match(report.trades[0].review.missed, /varsayımı yanlıştı/);
   assert.equal(report.trades[0].review.modelUpdate, "FROZEN_NO_AUTOMATIC_UPDATE");
 });
+
+test("sanal kasa hedef süresi, sermaye bağlanması ve ters hareketi ayrı raporlar", () => {
+  const first = row({ id: "a", entryAt: "2026-10-08T14:00:00Z", outcomeAt: "2026-10-08T14:30:00Z", grossReturn: 0.01 });
+  first.result.timeToOutcomeMinutes = 30;
+  first.result.mae = -0.003;
+  const second = row({ id: "b", symbol: "SNDK", entryAt: "2026-10-08T14:00:00Z", outcomeAt: "2026-10-08T15:30:00Z", grossReturn: 0.01 });
+  second.result.timeToOutcomeMinutes = 90;
+  second.result.mae = -0.012;
+  const report = simulatePaperPortfolio([first, second], { initialCapital: 10_000, maxConcurrent: 2 });
+  assert.equal(report.capitalEfficiency.targetTrades, 2);
+  assert.equal(report.capitalEfficiency.averageTargetMinutes, 60);
+  assert.equal(report.capitalEfficiency.medianTargetMinutes, 60);
+  assert.equal(report.capitalEfficiency.worstAdverseExcursion, -0.012);
+  assert.ok(report.capitalEfficiency.capitalSessionExposureUsd > 0);
+  assert.ok(Number.isFinite(report.capitalEfficiency.netReturnPerCapitalSession));
+});

@@ -172,6 +172,9 @@ test("canlı araştırma motoru olasılık uydurmaz", async () => {
   assert.ok(predictions.candidates.every((candidate) => candidate.dataLineage?.pointInTimeOrderValid === true));
   assert.ok(predictions.candidates.every((candidate) => candidate.timePolicy?.featureBarMinutes === 5));
   assert.ok(predictions.candidates.every((candidate) => candidate.timePolicy?.outcomeBarMinutes === 1));
+  assert.ok(predictions.candidates.every((candidate) => candidate.researchAxes?.targetReach?.probability === null));
+  assert.ok(predictions.candidates.every((candidate) => Number.isFinite(candidate.researchAxes?.targetTime?.expectedMinutes)));
+  assert.ok(predictions.candidates.every((candidate) => candidate.researchAxes?.netTradeValue?.value === null));
 });
 
 test("seans öncesinde boş liste yerine açık engel kararı üretilir", async () => {

@@ -28,6 +28,7 @@ const elements = Object.fromEntries([
   "assuranceEngineIcon", "assuranceEngine", "assuranceEngineDetail", "assuranceParityIcon", "assuranceParity", "assuranceParityDetail",
   "paperCapital", "paperRisk", "paperAllocation", "paperConcurrent", "paperReport", "paperReturn",
   "paperInitial", "paperFinal", "paperProfit", "paperTrades", "paperDrawdown", "paperExplanation", "paperLedger",
+  "paperTargetTime", "paperWorstMae", "paperCapitalEfficiency",
   "paperReviews", "replayDay", "archiveCoverage", "historicalDate", "historicalReplayButton", "replayModeNotice",
   "replayTrust", "replayTrustTitle", "replayTrustBadge", "replayTrustPlain", "replayTruthList", "replayWarningList", "replayCheckList",
   "journalPanel", "journalTitle", "journalSaved", "journalRange", "journalRangeDetail", "journalParams", "journalParamDetail",
@@ -36,7 +37,8 @@ const elements = Object.fromEntries([
   "opportunityCorrectEntry", "opportunityMissed", "opportunityRapidMissed", "opportunityWrongEntry", "opportunityCorrectWait", "opportunityTopCause", "opportunityList",
   "scoreProof", "scoreProofBadge", "scoreProofExplanation", "scoreProbe", "scoreProbeResult", "scoreProbeDetail",
   "scoreOfficialDays", "scoreOfficialSamples", "scoreModelSamples", "scoreMinimum", "scoreBandTable", "scoreThresholdTable",
-  "scorePreliminaryExplanation", "scorePreliminaryTable"
+  "scorePreliminaryExplanation", "scorePreliminaryTable", "axisTargetReach", "axisTargetReachDetail",
+  "axisTargetTime", "axisTargetTimeDetail", "axisCapitalRisk", "axisCapitalRiskDetail", "axisNetValue", "axisNetValueDetail"
 ].map((id) => [id, document.getElementById(id)]));
 
 function formatPrice(value) {
@@ -312,6 +314,29 @@ function renderScoreAudit(candidate) {
   elements.predictionCorrectness.className = Number.isFinite(candidate.pTargetFirst) ? "positive" : "warning-text";
 }
 
+function renderResearchAxes(candidate) {
+  const axes = candidate?.researchAxes;
+  if (!axes) {
+    elements.axisTargetReach.textContent = "—";
+    elements.axisTargetReachDetail.textContent = "Canlı aday bekleniyor.";
+    elements.axisTargetTime.textContent = "—";
+    elements.axisTargetTimeDetail.textContent = "Canlı aday bekleniyor.";
+    elements.axisCapitalRisk.textContent = "—";
+    elements.axisCapitalRiskDetail.textContent = "Canlı aday bekleniyor.";
+    elements.axisNetValue.textContent = "Üretilmiyor";
+    elements.axisNetValueDetail.textContent = "Üç bileşen doğrulanmadan sayı gösterilmez.";
+    return;
+  }
+  elements.axisTargetReach.textContent = `${axes.targetReach.evidenceScore}/100 kanıt`;
+  elements.axisTargetReachDetail.textContent = axes.targetReach.explanation;
+  elements.axisTargetTime.textContent = Number.isFinite(axes.targetTime.expectedMinutes) ? `~${axes.targetTime.expectedMinutes} dk kapasite` : "Belirsiz";
+  elements.axisTargetTimeDetail.textContent = axes.targetTime.explanation;
+  elements.axisCapitalRisk.textContent = Number.isFinite(axes.capitalRisk.adverseMovePct) ? formatPercent(-axes.capitalRisk.adverseMovePct * 100) : "Belirsiz";
+  elements.axisCapitalRiskDetail.textContent = axes.capitalRisk.explanation;
+  elements.axisNetValue.textContent = "Üretilmiyor";
+  elements.axisNetValueDetail.textContent = axes.netTradeValue.explanation;
+}
+
 function renderPrediction(predictions) {
   const candidate = predictions?.candidates?.find((item) => item.symbol === state.symbol && item.modelKey === state.model);
   if (!candidate) {
@@ -343,6 +368,7 @@ function renderPrediction(predictions) {
     renderCycle(null);
     renderMotorEvidence(null);
     renderScoreAudit(null);
+    renderResearchAxes(null);
     return;
   }
   const decisionText = ({ NO_TRADE: "Uzak dur", WATCH: "İzle", PAPER_RESEARCH: "Kağıt araştırma adayı" })[candidate.finalDecision] ?? candidate.finalDecision;
@@ -371,6 +397,7 @@ function renderPrediction(predictions) {
   renderCycle(candidate);
   renderMotorEvidence(candidate);
   renderScoreAudit(candidate);
+  renderResearchAxes(candidate);
   elements.scoreGrid.replaceChildren(...Object.entries(candidate.scores).map(([key, value]) => {
     const item = document.createElement("article");
     item.className = "score-item";
@@ -802,6 +829,10 @@ function renderPaperPortfolio(portfolio) {
   elements.paperReturn.className = portfolio?.totalReturn > 0 ? "positive" : portfolio?.totalReturn < 0 ? "negative" : "muted-text";
   elements.paperTrades.textContent = `${portfolio?.executedTrades ?? 0} açıldı · ${portfolio?.skippedSignals ?? 0} pas geçildi`;
   elements.paperDrawdown.textContent = Number.isFinite(portfolio?.maxRealizedDrawdown) ? formatPercent(-portfolio.maxRealizedDrawdown * 100) : "—";
+  const efficiency = portfolio?.capitalEfficiency;
+  elements.paperTargetTime.textContent = Number.isFinite(efficiency?.averageTargetMinutes) ? `${efficiency.averageTargetMinutes} dk` : "—";
+  elements.paperWorstMae.textContent = Number.isFinite(efficiency?.worstAdverseExcursion) ? formatPercent(efficiency.worstAdverseExcursion * 100) : "—";
+  elements.paperCapitalEfficiency.textContent = Number.isFinite(efficiency?.netReturnPerCapitalSession) ? formatPercent(efficiency.netReturnPerCapitalSession * 100) : "—";
   elements.paperExplanation.textContent = `Her mumu izler, ${portfolio?.cadenceMinutes ?? 15} dakikada bir düşünür · işlem başına %${portfolio?.settings?.riskPct ?? "—"} risk · tek pozisyonda en fazla %${portfolio?.settings?.maxPositionPct ?? "—"} kasa · ücret ve kayma dahil.`;
   elements.paperLedger.replaceChildren();
   elements.paperReviews.replaceChildren();
